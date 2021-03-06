@@ -146,18 +146,12 @@ public:
 		}
 		else if (input_manager.keys_[sf::Keyboard::Key::Numpad1])
 		{
-			float f_near = this->GetCamera().GetNear() - angle;
-			if (f_near < 0.000001f)
-				f_near = 0.000001f;
-
+			float f_near = this->GetCamera().GetNear() - forward;
 			this->GetCamera().SetNear(f_near);
 		}
 		else if (input_manager.keys_[sf::Keyboard::Key::Numpad3])
 		{
-			float f_near = this->GetCamera().GetNear() + angle;
-			if (f_near > this->GetCamera().GetFar())
-				f_near = this->GetCamera().GetFar();
-
+			float f_near = this->GetCamera().GetNear() + forward;
 			this->GetCamera().SetNear(f_near);
 		}
 
@@ -168,18 +162,12 @@ public:
 		}
 		else if (input_manager.keys_[sf::Keyboard::Key::Numpad7])
 		{
-			float f_far = this->GetCamera().GetFar() - angle;
-			if (f_far < this->GetCamera().GetNear())
-				f_far = this->GetCamera().GetNear();
-
+			float f_far = this->GetCamera().GetFar() - forward;
 			this->GetCamera().SetFar(f_far);
 		}
 		else if (input_manager.keys_[sf::Keyboard::Key::Numpad9])
 		{
-			float f_far = this->GetCamera().GetFar() + angle;
-			if (f_far > 1000.f)
-				f_far = 1000.f;
-
+			float f_far = this->GetCamera().GetFar() + forward;
 			this->GetCamera().SetFar(f_far);
 		}
 

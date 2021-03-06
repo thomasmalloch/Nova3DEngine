@@ -514,7 +514,7 @@ namespace nova
 		void RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], sf::Uint8 pixels[], class sf::RenderTexture& minimap);
 		void RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
 		void RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Image& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
-		void RasterizePseudoPlaneSlice(sf::Uint8 pixels[], const class sf::Image& floor_texture, const class sf::Image& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
+		void RasterizePseudoPlaneSlice(sf::Uint8 pixels[], float wall_z, const class sf::Image& floor_texture, const class sf::Image& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
 		void RenderNodeActors(const class Node& node, class sf::Image& pixels, const sf::FloatRect& normalized_bounds);
 		void RenderUI();
 		void UpdateActorPositions();
