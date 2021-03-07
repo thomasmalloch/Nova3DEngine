@@ -45,7 +45,7 @@ void NovaEngine::Run()
 	sf::Time timeSinceLastFramerateUpdate = sf::Time::Zero;
 	
 	// create pixel buffer
-	sf::Uint8* pixels = new sf::Uint8[width_ * height_ * 4];
+	Texture* pixels = new Texture(width_, height_);
 
 	sf::Image pixel_buffer;
 	pixel_buffer.create(width_, height_);
@@ -115,16 +115,7 @@ void NovaEngine::Run()
 		ui.clear(sf::Color::Transparent);
 		minimap.clear(sf::Color(0, 0, 0, 200));
 		render_window_->clear(sf::Color::Black);		
-		for (int x = 0; x < width_; x++) 
-		{
-			for (int y = 0; y <= height_ - 1; y++) 
-			{
-				pixels[(x + y * width_) * 4 + 0] = 0;
-				pixels[(x + y * width_) * 4 + 1] = 0;
-				pixels[(x + y * width_) * 4 + 2] = 0;
-				pixels[(x + y * width_) * 4 + 3] = 255;
-			}
-		}
+		pixels->Clear();
 
 		// render map
 		sf::Vector2f render_bounds[4] = { {0, 0}, {1.f, 0}, {1.f, 1.f}, {0.f, 1.f} };
@@ -137,10 +128,10 @@ void NovaEngine::Run()
 
 		// map borders
 		std::vector<sf::Vertex> lines;
-		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - 100, 0)));
-		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f + 100, 0)));
-		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - 100, height_ / 4.f - 1)));
-		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f + 100, height_ / 4.f - 1)));
+		lines.push_back(sf::Vertex(sf::Vector2f(0, 0)));
+		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 4.f, 0)));
+		lines.push_back(sf::Vertex(sf::Vector2f(0, height_ / 4.f - 1)));
+		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 4.f, height_ / 4.f - 1)));
 
 		lines.push_back(sf::Vertex(sf::Vector2f(1, 0)));
 		lines.push_back(sf::Vertex(sf::Vector2f(1, height_ / 4.f - 1)));
@@ -162,7 +153,7 @@ void NovaEngine::Run()
 		minimap.draw(player);
 
 		// draw map
-		texture.update(pixels);
+		texture.update(pixels->GetData());
 		render_window_->draw(buffer);
 
 		// draw minimap
@@ -179,7 +170,7 @@ void NovaEngine::Run()
 		render_window_->display();
 	}
 
-	delete[] pixels;
+	delete pixels;
 }
 
 inline void NovaEngine::End() 
@@ -189,10 +180,8 @@ inline void NovaEngine::End()
 }
 
 
-void NovaEngine::RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], sf::Uint8 pixels[], class sf::RenderTexture& minimap)
+void NovaEngine::RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], class Texture* pixels, class sf::RenderTexture& minimap)
 {
-	
-
 	// render walls and minimap
 	std::vector<sf::Vertex> lines;
 	for (auto wall : render_node.walls_)
@@ -423,7 +412,7 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 	minimap.draw(&lines[0], lines.size(), sf::Lines);
 }
 
-void NovaEngine::RenderPlanes(sf::Uint8 pixels[], const class Node& render_node, const sf::Vector2f normalized_bounds[4])
+void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_node, const sf::Vector2f normalized_bounds[4])
 {
 	// render the floor/ceiling. this uses actual 3d projection!
 	// floor
@@ -493,7 +482,7 @@ void NovaEngine::RenderPlanes(sf::Uint8 pixels[], const class Node& render_node,
 	RasterizePolygon(pixels, points, 4, *render_node.ceiling_texture_);
 }
 
-void NovaEngine::RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space)
+void NovaEngine::RasterizeVerticalSlice(class Texture* pixels, const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space)
 {
 	if (screen_space.top == INT_MIN || screen_space.height == INT_MIN)
 		return;
@@ -508,15 +497,12 @@ void NovaEngine::RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Colo
 		if ((y < y1) || (y >= y2))
 			break;
 
-		pixels[(screen_space.left + y * width_) * 4 + 0] = colour.r;
-		pixels[(screen_space.left + y * width_) * 4 + 1] = colour.g;
-		pixels[(screen_space.left + y * width_) * 4 + 2] = colour.b;
-		pixels[(screen_space.left + y * width_) * 4 + 3] = colour.a;
+		pixels->SetPixel(screen_space.left, y, colour);
 	}
 }
 
 // Rasterizes a CONVEX polygon with a CLOCKWISE winding
-void NovaEngine::RasterizePolygon(sf::Uint8 pixels[], const class Point3D vertices[], int vertex_count, const class sf::Image& texture)
+void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D vertices[], int vertex_count, const class Texture& texture)
 {
 	for (int i = 0; i < vertex_count - 3 + 1; i++) 
 	{
@@ -586,15 +572,11 @@ void NovaEngine::RasterizePolygon(sf::Uint8 pixels[], const class Point3D vertic
 					tex_v = (1.0f - t) * v1 + t * v2;
 					tex_w = (1.0f - t) * w1 + t * w2;
 
-					sf::Color colour = texture.getPixel(
-						(int)(tex_u / tex_w * texture.getSize().x) % texture.getSize().x,
-						(int)(tex_v / tex_w * texture.getSize().y - 1) % (texture.getSize().y - 1));
+					sf::Color colour = texture.GetPixel(
+						(int)(tex_u / tex_w * texture.GetWidth()) % texture.GetWidth(),
+						(int)(tex_v / tex_w * texture.GetHeight()) % (texture.GetHeight()));
 
-					pixels[(x + y * width_) * 4 + 0] = colour.r;
-					pixels[(x + y * width_) * 4 + 1] = colour.g;
-					pixels[(x + y * width_) * 4 + 2] = colour.b;
-					pixels[(x + y * width_) * 4 + 3] = colour.a;
-
+					pixels->SetPixel(x, y, colour);
 					t += tstep;
 				}
 			}
@@ -642,15 +624,12 @@ void NovaEngine::RasterizePolygon(sf::Uint8 pixels[], const class Point3D vertic
 					tex_v = (1.0f - t) * v1 + t * v2;
 					tex_w = (1.0f - t) * w1 + t * w2;
 
-					sf::Color colour = texture.getPixel(
-						(int)(tex_u / tex_w * texture.getSize().x) % texture.getSize().x,
-						(int)(tex_v / tex_w * texture.getSize().y - 1) % (texture.getSize().y - 1));
+					sf::Color colour = texture.GetPixel(
+						(int)(tex_u / tex_w * texture.GetWidth()) % texture.GetWidth(),
+						(int)(tex_v / tex_w * texture.GetHeight()) % (texture.GetHeight()));
 
-					//colour = sf::Color::Yellow;
-					pixels[(x + y * width_) * 4 + 0] = colour.r;
-					pixels[(x + y * width_) * 4 + 1] = colour.g;
-					pixels[(x + y * width_) * 4 + 2] = colour.b;
-					pixels[(x + y * width_) * 4 + 3] = colour.a;
+					pixels->SetPixel(x, y, colour);
+
 
 					t += tstep;
 				}
@@ -659,12 +638,12 @@ void NovaEngine::RasterizePolygon(sf::Uint8 pixels[], const class Point3D vertic
 	}
 }
 
-void NovaEngine::RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Image& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space)
+void NovaEngine::RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space)
 {	
 	if (screen_space.top == INT_MIN || screen_space.height == INT_MIN)
 		return;
 	
-	int u = (int)(uv.left * texture.getSize().x) % texture.getSize().x;
+	int u = (int)(uv.left * texture.GetWidth()) % texture.GetWidth();
 	int y1 = Math::Clamp(0, height_, screen_space.top);
 	int y2 = Math::Clamp(0, height_, screen_space.top + screen_space.height);
 	for (int y = y1; y < y2; y++)
@@ -675,17 +654,14 @@ void NovaEngine::RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Imag
 		if ((y < y1) || (y >= y2))
 			break;
 
-		int v = (int)((uv.top + ((uv.height - uv.top) / ((screen_space.top + screen_space.height) - screen_space.top)) * (y - screen_space.top)) * (texture.getSize().y - 1)) % (texture.getSize().y - 1);
-		sf::Color colour = texture.getPixel(u, v);
-		pixels[(screen_space.left + y * width_) * 4 + 0] = colour.r;
-		pixels[(screen_space.left + y * width_) * 4 + 1] = colour.g;
-		pixels[(screen_space.left + y * width_) * 4 + 2] = colour.b;
-		pixels[(screen_space.left + y * width_) * 4 + 3] = colour.a;
+		int v = (int)((uv.top + ((uv.height - uv.top) / ((screen_space.top + screen_space.height) - screen_space.top)) * (y - screen_space.top)) * (texture.GetHeight())) % (texture.GetHeight());
+		sf::Color colour = texture.GetPixel(u, v);
+		pixels->SetPixel(screen_space.left, y, colour);
 	}
 }
 
-void NovaEngine::RasterizePseudoPlaneSlice(
-	sf::Uint8 pixels[],
+void RasterizePseudoPlaneSlice(
+	class Texture* pixels,
 	float wall_z,
 	const class sf::Image& floor_texture,
 	const class sf::Image& ceiling_texture,
@@ -784,7 +760,7 @@ void NovaEngine::RasterizePseudoPlaneSlice(
 	}*/
 }
 
-void NovaEngine::RenderNodeActors(const class Node& node, class sf::Image& pixels, const sf::FloatRect& normalized_bounds)
+void NovaEngine::RenderNodeActors(const class Node& node, class Texture* pixels, const sf::FloatRect& normalized_bounds)
 {
 	float* depth_buffer = new float[width_ * height_];
 	depth_buffer = { 0 };

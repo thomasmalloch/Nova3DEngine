@@ -20,9 +20,9 @@ public:
 	class Player* player_;
 	class Map* map_;
 
-	class sf::Image* wall_texture_;
-	class sf::Image* floor_texture_;
-	class sf::Image* ceiling_texture_;
+	class Texture* wall_texture_;
+	class Texture* floor_texture_;
+	class Texture* ceiling_texture_;
 
 	void UserLoad() 
 	{
@@ -47,18 +47,21 @@ public:
 		map_->nodes_[4]->ceiling_height_ += 10;
 
 
-		wall_texture_ = new sf::Image();
-		wall_texture_->loadFromFile("wall.png");
-		
-		floor_texture_ = new sf::Image();
-		floor_texture_->loadFromFile("floor.png");
+		sf::Image wall_image;
+		wall_image.loadFromFile("wall.png");
+		wall_texture_ = new Texture(wall_image);
 
-		ceiling_texture_ = new sf::Image();
-		ceiling_texture_->loadFromFile("ceiling.png");
+		sf::Image floor_image;
+		floor_image.loadFromFile("floor.png");
+		floor_texture_ = new Texture(floor_image);
+
+		sf::Image ceiling_image;
+		ceiling_image.loadFromFile("ceiling.png");
+		ceiling_texture_ = new Texture(ceiling_image);
 
 		// add texture to walls/floor/ceiling
-		int tex_width = 100;
-		int tex_height = 100;
+		int tex_width = 50;
+		int tex_height = 50;
 
 		for (int i = 0; i < map_->nodes_.size(); i++)
 		{

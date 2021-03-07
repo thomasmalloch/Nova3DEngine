@@ -337,6 +337,89 @@ namespace nova
 		class Point3D p_[3];
 	};
 
+	class Texture
+	{
+	private:
+		sf::Uint8* data_;
+		sf::Vector2u size_;
+
+	public:
+		inline Texture(const class sf::Image& image) 
+		{
+			size_ = image.getSize();
+			data_ = new sf::Uint8[ size_.x * size_.y * 4 ];
+			for (int x = 0; x < size_.x; x++) 
+			{
+				for (int y = 0; y < size_.y; y++) 
+				{
+					int offset = (x + y * size_.x) * 4;
+					sf::Color colour = image.getPixel(x, y);
+					data_[offset + 0] = colour.r;
+					data_[offset + 1] = colour.g;
+					data_[offset + 2] = colour.b;
+					data_[offset + 3] = colour.a;
+				}
+			}
+		}
+
+		inline Texture(sf::Uint32 x, sf::Uint32 y)
+		{
+			size_ = { x, y };
+			data_ = new sf::Uint8[size_.x * size_.y * 4];
+		}
+
+		inline ~Texture() 
+		{
+			delete[] data_;
+		}
+
+		inline const sf::Vector2u GetSize() const
+		{
+			return size_;		
+		}
+
+		inline const unsigned int GetWidth() const
+		{
+			return size_.x;
+		}
+
+		inline const unsigned int GetHeight() const
+		{
+			return size_.y;
+		}
+
+		inline const sf::Color GetPixel(unsigned int x, unsigned int y) const
+		{
+			int offset = (x + y * size_.x) * 4;
+			return
+			{
+				data_[offset + 0],
+				data_[offset + 1],
+				data_[offset + 2],
+				data_[offset + 3],
+			};
+		}
+
+		inline void SetPixel(int x, int y, const sf::Color colour) 
+		{
+			int offset = (x + y * size_.x) * 4;
+			data_[offset + 0] = colour.r;
+			data_[offset + 1] = colour.g;
+			data_[offset + 2] = colour.b;
+			data_[offset + 3] = colour.a;
+		}
+
+		inline void Clear() 
+		{
+			memset(&data_[0], 0xff000000, size_.x * size_.y * 4);
+		}
+
+		inline const sf::Uint8* GetData() const
+		{
+			return data_;
+		}
+	};
+
 	class Wall
 	{
 	public:
@@ -350,7 +433,7 @@ namespace nova
 
 		// Texture and Colour information
 		sf::Color colour_;
-		const sf::Image* wall_texture_;
+		const Texture* wall_texture_;
 		float texture_height_pixels_;
 
 		// Portal destination
@@ -366,8 +449,8 @@ namespace nova
 	class Node
 	{
 	public:
-		const sf::Image* ceiling_texture_;
-		const sf::Image* floor_texture_;
+		const Texture* ceiling_texture_;
+		const Texture* floor_texture_;
 		std::vector<class Wall*> walls_;
 		std::vector<class Sprite*> temp_;
 		std::vector<class IActor*> actors_;
@@ -536,17 +619,17 @@ namespace nova
 	protected:
 	private:
 		// private functions
-		void RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], sf::Uint8 pixels[], class sf::RenderTexture& minimap);
-		void RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
-		void RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Image& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);				
-		void RasterizePseudoPlaneSlice(sf::Uint8 pixels[], float wall_z, const class sf::Image& floor_texture, const class sf::Image& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
-		void RasterizePolygon(sf::Uint8 pixels[], const class Point3D points[], int vertex_count, const class sf::Image& texture);
-		void RenderPlanes(sf::Uint8 pixels[], const class Node& render_node, const sf::Vector2f normalized_bounds[4]);
+		void RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], class Texture* pixels, class sf::RenderTexture& minimap);
+		void RasterizeVerticalSlice(class Texture* pixels, const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
+		void RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
+		void RasterizePseudoPlaneSlice(class Texture* pixels, float wall_z, const class Texture& floor_texture, const class Texture& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
+		void RasterizePolygon(class Texture* pixels, const class Point3D points[], int vertex_count, const class Texture& texture);
+		void RenderPlanes(class Texture* pixels, const class Node& render_node, const sf::Vector2f normalized_bounds[4]);
 
 		void ClipTriangle(const class Point3D points[3], class Point3D new_points[10], int vertex_count);
 
 
-		void RenderNodeActors(const class Node& node, class sf::Image& pixels, const sf::FloatRect& normalized_bounds);
+		void RenderNodeActors(const class Node& node, class Texture* pixels, const sf::FloatRect& normalized_bounds);
 		void RenderUI();
 		void UpdateActorPositions();
 		void ProcessInput(const class sf::Event& event);		
