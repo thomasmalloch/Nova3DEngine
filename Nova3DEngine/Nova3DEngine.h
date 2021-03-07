@@ -100,6 +100,23 @@ namespace nova
 		}
 	};
 
+	class Slope 
+	{
+	private:
+		float slope_;
+
+	public:
+		inline Slope(float dy, float dx) 
+		{
+			slope_ = dy / dx;
+		}
+
+		inline float Interpolate(float start, float step) 
+		{
+			return start + slope_ * step;
+		}
+	};
+
 	struct Matrix4x4
 	{
 		float m_[4][4] = { 0 };
@@ -268,27 +285,21 @@ namespace nova
 		class Frustum* pseudo_plane_frustrum_;
 
 		void UpdateWallClippingPlanes();
-		void UpdatePseudoPlaneFrustrum();
 
 	public:
 		
-		Camera(float screen_width, float screen_height, float frustrum_near, float frustrum_far);
+		Camera(float screen_width, float screen_height);
 		~Camera();
 		void SetPosition(float x, float y, float z);
 		void SetPosition(sf::Vector3f position);
 		void SetAngle(float angle);
 		void SetFOVDegrees(float fov_degrees);
 		void SetFOVRadians(float fov_rad);
-		void SetNear(float pseudo_plane_near);
-		void SetFar(float pseudo_plane_far);
 		void SetCurrentNode(class Node* node);
 
-		const sf::Vector2f& GetScale();
-		float GetNear();
-		float GetFar();		
+		const sf::Vector2f& GetScale();	
 		class Node* GetCurrentNode();
 		const class Frustum& GetWallClippingPlanes();
-		const class Frustum& GetPseudoPlaneFrustum();
 		float GetFOV();
 		float GetFOVHalf();
 		float GetAngle();
@@ -313,6 +324,17 @@ namespace nova
 		sf::Vector3f position_;
 		int actor_type_index;
 		float angle_;
+	};
+
+	struct Point3D
+	{
+		sf::Vector3f xyz_;
+		sf::Vector3f uvw_;
+	};
+
+	struct Triangle 
+	{
+		class Point3D p_[3];
 	};
 
 	class Wall
@@ -349,6 +371,9 @@ namespace nova
 		std::vector<class Wall*> walls_;
 		std::vector<class Sprite*> temp_;
 		std::vector<class IActor*> actors_;
+
+		sf::Vector2f plane_xy_quad_[4];
+		sf::Vector2f plane_uv_quad_[4];
 
 		float floor_height_;
 		float ceiling_height_;
@@ -513,8 +538,14 @@ namespace nova
 		// private functions
 		void RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], sf::Uint8 pixels[], class sf::RenderTexture& minimap);
 		void RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
-		void RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Image& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
+		void RasterizeVerticalSlice(sf::Uint8 pixels[], const class sf::Image& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);				
 		void RasterizePseudoPlaneSlice(sf::Uint8 pixels[], float wall_z, const class sf::Image& floor_texture, const class sf::Image& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
+		void RasterizePolygon(sf::Uint8 pixels[], const class Point3D points[], int vertex_count, const class sf::Image& texture);
+		void RenderPlanes(sf::Uint8 pixels[], const class Node& render_node, const sf::Vector2f normalized_bounds[4]);
+
+		void ClipTriangle(const class Point3D points[3], class Point3D new_points[10], int vertex_count);
+
+
 		void RenderNodeActors(const class Node& node, class sf::Image& pixels, const sf::FloatRect& normalized_bounds);
 		void RenderUI();
 		void UpdateActorPositions();

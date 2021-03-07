@@ -57,26 +57,68 @@ public:
 		ceiling_texture_->loadFromFile("ceiling.png");
 
 		// add texture to walls/floor/ceiling
-		int tex_width = 16;
-		int tex_height = 16;
+		int tex_width = 100;
+		int tex_height = 100;
 
 		for (int i = 0; i < map_->nodes_.size(); i++)
 		{
+			Node* node = map_->nodes_[i];
+
+			// assign node textures
+			node->floor_texture_ = floor_texture_;
+			node->ceiling_texture_ = ceiling_texture_;
+
 			float last_u = 0;
-			for (int j = 0; j < map_->nodes_[i]->walls_.size(); j++)
-			{
-				Node* node = map_->nodes_[i];
-				node->floor_texture_ = floor_texture_;
-				node->ceiling_texture_ = ceiling_texture_;
-				node->walls_[j]->wall_texture_ = wall_texture_;
-				float dx = node->walls_[j]->p2_.x - node->walls_[j]->p1_.x;
-				float dy = node->walls_[j]->p2_.y - node->walls_[j]->p1_.y;
+			float top = FLT_MAX;
+			float left = FLT_MAX;
+			float right = FLT_MIN;
+			float bottom = FLT_MIN;
+
+			for (int j = 0; j < node->walls_.size(); j++)
+			{				
+				Wall* wall = node->walls_[j];
+
+				// assign texture				
+				wall->wall_texture_ = wall_texture_;
+
+				// figure out wall texture coords
+				float dx = wall->p2_.x - wall->p1_.x;
+				float dy = wall->p2_.y - wall->p1_.y;
 				float len = sqrtf(dx * dx + dy * dy);
-				node->walls_[j]->uv1_.x = last_u;
-				node->walls_[j]->uv2_.x = last_u + len / tex_width;
-				node->walls_[j]->texture_height_pixels_ = tex_height;
+				wall->uv1_.x = last_u;
+				wall->uv2_.x = last_u + len / tex_width;
+				wall->texture_height_pixels_ = tex_height;
 				last_u -= (int)last_u;
+
+				// figure out node plane coords
+				if (wall->p1_.x < left)
+					left = wall->p1_.x;
+				if (wall->p2_.x < left)
+					left = wall->p2_.x;
+				if (wall->p1_.x > right)
+					right = wall->p1_.x;
+				if (wall->p2_.x > right)
+					right = wall->p2_.x;
+
+				if (wall->p1_.y < top)
+					top = wall->p1_.y;
+				if (wall->p2_.y < top)
+					top = wall->p2_.y;
+				if (wall->p1_.y > bottom)
+					bottom = wall->p1_.y;
+				if (wall->p2_.y > bottom)
+					bottom = wall->p2_.y;
 			}
+
+			node->plane_xy_quad_[0] = { left, top };
+			node->plane_xy_quad_[1] = { right, top };
+			node->plane_xy_quad_[2] = { right, bottom };
+			node->plane_xy_quad_[3] = { left, bottom };
+			
+			node->plane_uv_quad_[0] = { 0, 0 };
+			node->plane_uv_quad_[1] = { (node->plane_xy_quad_[1].x - node->plane_xy_quad_[0].x) / tex_width, 0 };
+			node->plane_uv_quad_[2] = { node->plane_uv_quad_[1].x, (node->plane_xy_quad_[3].y - node->plane_xy_quad_[0].y) / tex_height };
+			node->plane_uv_quad_[3] = { 0, node->plane_uv_quad_[2].y };
 		}
 
 		LoadMap(map_);
@@ -88,7 +130,6 @@ public:
 		player_->height_ = 16;		
 		AddPlayer(player_);
 
-		this->GetCamera().SetFar(40.f);
 		this->GetCamera().SetCurrentNode(player_->current_node_);
 		this->GetCamera().SetPosition( { player_->position_.x, player_->position_.y, player_->position_.z + player_->height_ } );
 		this->GetCamera().SetFOVRadians(Math::half_pi_);
@@ -137,38 +178,6 @@ public:
 				fov = Math::pi_;
 
 			this->GetCamera().SetFOVRadians(fov);
-		}
-
-		// near adjust
-		if (input_manager.keys_[sf::Keyboard::Key::Numpad2])
-		{
-			this->GetCamera().SetNear(0.1f);
-		}
-		else if (input_manager.keys_[sf::Keyboard::Key::Numpad1])
-		{
-			float f_near = this->GetCamera().GetNear() - forward;
-			this->GetCamera().SetNear(f_near);
-		}
-		else if (input_manager.keys_[sf::Keyboard::Key::Numpad3])
-		{
-			float f_near = this->GetCamera().GetNear() + forward;
-			this->GetCamera().SetNear(f_near);
-		}
-
-		// far adjust
-		if (input_manager.keys_[sf::Keyboard::Key::Numpad8])
-		{
-			this->GetCamera().SetFar(40.f);
-		}
-		else if (input_manager.keys_[sf::Keyboard::Key::Numpad7])
-		{
-			float f_far = this->GetCamera().GetFar() - forward;
-			this->GetCamera().SetFar(f_far);
-		}
-		else if (input_manager.keys_[sf::Keyboard::Key::Numpad9])
-		{
-			float f_far = this->GetCamera().GetFar() + forward;
-			this->GetCamera().SetFar(f_far);
 		}
 
 		// player movement
@@ -239,7 +248,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	
 	EngineTest* test = new EngineTest();
 
-	test->Setup(960, 540, 2, false);
+	test->Setup(1280, 720, 1, false);
 	test->Run();
 
 	return 0;
