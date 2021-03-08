@@ -60,8 +60,11 @@ public:
 		ceiling_texture_ = new Texture(ceiling_image);
 
 		// add texture to walls/floor/ceiling
-		int tex_width = 50;
-		int tex_height = 50;
+		int plane_tex_width = 100;
+		int plane_tex_height = 100;
+
+		int wall_tex_width = 16;
+		int wall_tex_height = 16;
 
 		for (int i = 0; i < map_->nodes_.size(); i++)
 		{
@@ -74,8 +77,6 @@ public:
 			float last_u = 0;
 			float top = FLT_MAX;
 			float left = FLT_MAX;
-			float right = FLT_MIN;
-			float bottom = FLT_MIN;
 
 			for (int j = 0; j < node->walls_.size(); j++)
 			{				
@@ -89,39 +90,29 @@ public:
 				float dy = wall->p2_.y - wall->p1_.y;
 				float len = sqrtf(dx * dx + dy * dy);
 				wall->uv1_.x = last_u;
-				wall->uv2_.x = last_u + len / tex_width;
-				wall->texture_height_pixels_ = tex_height;
+				wall->uv2_.x = last_u + len / wall_tex_width;
+				wall->texture_height_pixels_ = wall_tex_height;
 				last_u -= (int)last_u;
 
-				// figure out node plane coords
+				// figure out node texture offset coords
 				if (wall->p1_.x < left)
 					left = wall->p1_.x;
 				if (wall->p2_.x < left)
 					left = wall->p2_.x;
-				if (wall->p1_.x > right)
-					right = wall->p1_.x;
-				if (wall->p2_.x > right)
-					right = wall->p2_.x;
-
 				if (wall->p1_.y < top)
 					top = wall->p1_.y;
 				if (wall->p2_.y < top)
 					top = wall->p2_.y;
-				if (wall->p1_.y > bottom)
-					bottom = wall->p1_.y;
-				if (wall->p2_.y > bottom)
-					bottom = wall->p2_.y;
 			}
 
-			node->plane_xy_quad_[0] = { left, top };
-			node->plane_xy_quad_[1] = { right, top };
-			node->plane_xy_quad_[2] = { right, bottom };
-			node->plane_xy_quad_[3] = { left, bottom };
-			
-			node->plane_uv_quad_[0] = { 0, 0 };
-			node->plane_uv_quad_[1] = { (node->plane_xy_quad_[1].x - node->plane_xy_quad_[0].x) / tex_width, 0 };
-			node->plane_uv_quad_[2] = { node->plane_uv_quad_[1].x, (node->plane_xy_quad_[3].y - node->plane_xy_quad_[0].y) / tex_height };
-			node->plane_uv_quad_[3] = { 0, node->plane_uv_quad_[2].y };
+			for (auto wall : node->walls_) 
+			{
+				node->plane_xy_.push_back(wall->p1_);
+				node->plane_xy_.push_back(wall->p2_);
+
+				node->plane_uv_.push_back({ (wall->p1_.x - left) / plane_tex_width, (wall->p1_.y - top) / plane_tex_height });
+				node->plane_uv_.push_back({ (wall->p2_.x - left) / plane_tex_width, (wall->p2_.y - top) / plane_tex_height });
+			}
 		}
 
 		LoadMap(map_);

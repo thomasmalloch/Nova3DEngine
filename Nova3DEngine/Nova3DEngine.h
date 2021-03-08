@@ -6,6 +6,7 @@
 #include <string>
 #include <fstream>
 #include <iostream>
+#include <thread>
 
 namespace nova 
 {
@@ -98,6 +99,23 @@ namespace nova
 			// Return the point of intersection
 			return {x, y};
 		}
+	};
+
+	class Plane 
+	{
+	private:
+		sf::Vector3f normal_;
+
+	public:
+		inline Plane(sf::Vector3f plane) 
+		{
+		}
+
+		inline float GetDistance() 
+		{
+		}
+
+
 	};
 
 	class Slope 
@@ -411,6 +429,7 @@ namespace nova
 
 		inline void Clear() 
 		{
+			// back with full alpha
 			memset(&data_[0], 0xff000000, size_.x * size_.y * 4);
 		}
 
@@ -455,8 +474,8 @@ namespace nova
 		std::vector<class Sprite*> temp_;
 		std::vector<class IActor*> actors_;
 
-		sf::Vector2f plane_xy_quad_[4];
-		sf::Vector2f plane_uv_quad_[4];
+		std::vector<sf::Vector2f> plane_xy_;
+		std::vector<sf::Vector2f> plane_uv_;
 
 		float floor_height_;
 		float ceiling_height_;
@@ -622,11 +641,12 @@ namespace nova
 		void RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], class Texture* pixels, class sf::RenderTexture& minimap);
 		void RasterizeVerticalSlice(class Texture* pixels, const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
 		void RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
-		void RasterizePseudoPlaneSlice(class Texture* pixels, float wall_z, const class Texture& floor_texture, const class Texture& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
+		//void RasterizePseudoPlaneSlice(class Texture* pixels, float wall_z, const class Texture& floor_texture, const class Texture& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
 		void RasterizePolygon(class Texture* pixels, const class Point3D points[], int vertex_count, const class Texture& texture);
 		void RenderPlanes(class Texture* pixels, const class Node& render_node, const sf::Vector2f normalized_bounds[4]);
 
-		void ClipTriangle(const class Point3D points[3], class Point3D new_points[10], int vertex_count);
+		//
+		int ClipTriangle(const class Point3D points[3], class Point3D* new_points[10]);
 
 
 		void RenderNodeActors(const class Node& node, class Texture* pixels, const sf::FloatRect& normalized_bounds);
@@ -647,7 +667,7 @@ namespace nova
 		int width_;
 		int height_;
 		bool is_fullscreen_;
-
+		float* depth_buffer;
 
 		bool is_running_ = false;
 	};
