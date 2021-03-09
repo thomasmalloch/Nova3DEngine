@@ -16,7 +16,7 @@ class Player : public nova::IPlayer
 
 class EngineTest : public nova::NovaEngine
 {
-public:
+private:
 	class Player* player_;
 	class Map* map_;
 
@@ -24,12 +24,26 @@ public:
 	class Texture* floor_texture_;
 	class Texture* ceiling_texture_;
 
+	LPWSTR command_line_;
+
+public:
+	EngineTest(LPWSTR command_line) 
+	{
+		command_line_ = command_line;
+	}
+
 	void UserLoad() 
 	{
-		/*Wall *w = new Wall(-10, 32, -10, -32, sf::Color::White);
+		/*Wall *w1 = new Wall(-10, 32, -10, -32, sf::Color::White);
+		Wall *w2 = new Wall(10, 32, 10, -32, sf::Color::White);
+		Wall *w3 = new Wall(-10, -32, -10, -64, sf::Color::White);
+		Wall *w4 = new Wall(10, -32, 10, -64, sf::Color::White);
 		
 		Node *n = new Node();
-		n->walls_.push_back(w);
+		n->walls_.push_back(w1);
+		n->walls_.push_back(w2);
+		n->walls_.push_back(w3);
+		n->walls_.push_back(w4);
 		n->floor_height_ = 0;
 		n->ceiling_height_ = 32;
 
@@ -38,14 +52,30 @@ public:
 		map_->player_angle_ = Math::pi_;
 		map_->player_start_ = { 16, 0, 0};*/
 
+		//map_ = new Map("square.map");
+		//map_ = new Map("octagon.map");
+		//map_ = new Map("level1.map");
+		//std::wcsstr(
+		
+		//char zoop[100] = { 0 };
+		std::wstring wide(command_line_);
+		std::string zoop(wide.begin(), wide.end());
 
-		map_ = new Map("level1.map");
-		map_->nodes_[1]->floor_height_ -= 10;
-		map_->nodes_[1]->ceiling_height_ -= 10;
+		if (zoop.length() == 0)
+			zoop = "level2.map";
 
-		map_->nodes_[4]->floor_height_ += 10;
-		map_->nodes_[4]->ceiling_height_ += 10;
+		map_ = new Map(zoop);
+		if (map_->nodes_.size() > 1) 
+		{
+			map_->nodes_[1]->floor_height_ -= 10;
+			map_->nodes_[1]->ceiling_height_ -= 10;
+		}
 
+		if (map_->nodes_.size() > 4) 
+		{
+			map_->nodes_[4]->floor_height_ += 10;
+			map_->nodes_[4]->ceiling_height_ += 10;
+		}
 
 		sf::Image wall_image;
 		wall_image.loadFromFile("wall.png");
@@ -108,10 +138,10 @@ public:
 			for (auto wall : node->walls_) 
 			{
 				node->plane_xy_.push_back(wall->p1_);
-				node->plane_xy_.push_back(wall->p2_);
+				//node->plane_xy_.push_back(wall->p2_);
 
 				node->plane_uv_.push_back({ (wall->p1_.x - left) / plane_tex_width, (wall->p1_.y - top) / plane_tex_height });
-				node->plane_uv_.push_back({ (wall->p2_.x - left) / plane_tex_width, (wall->p2_.y - top) / plane_tex_height });
+				//node->plane_uv_.push_back({ (wall->p2_.x - left) / plane_tex_width, (wall->p2_.y - top) / plane_tex_height });
 			}
 		}
 
@@ -119,7 +149,7 @@ public:
 
 		player_ = new Player();
 		player_->position_ = map_->player_start_;
-		player_->UpdateAngle(map_->player_angle_);
+		player_->UpdateAngle(map_->player_angle_ + 0.01f);
 		player_->current_node_ = map_->nodes_[map_->player_node_index_];
 		player_->height_ = 16;		
 		AddPlayer(player_);
@@ -240,9 +270,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
 
 	
-	EngineTest* test = new EngineTest();
+	EngineTest* test = new EngineTest(lpCmdLine);
 
+#if _DEBUG
+	test->Setup(1280, 720, 2, false);
+#else
 	test->Setup(1280, 720, 1, false);
+#endif
+
 	test->Run();
 
 	return 0;

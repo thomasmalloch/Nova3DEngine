@@ -84,6 +84,21 @@ namespace nova
 			return x1 * x2 + y1 * y2;
 		}
 
+		static inline float DotProduct(float x1, float y1, float z1, float x2, float y2, float z2)
+		{
+			return x1 * x2 + y1 * y2 + z1 * z2;
+		}
+
+		static inline float DotProduct(sf::Vector3f a, sf::Vector3f b)
+		{
+			return a.x * b.x + a.y * b.y + a.z * b.z;
+		}
+
+		static inline float DotProduct(sf::Vector2f a, sf::Vector2f b)
+		{
+			return a.x * b.x + a.y * b.y;
+		}
+
 		static inline const sf::Vector2f& const Intersect (float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4)
 		{
 			float d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
@@ -99,23 +114,53 @@ namespace nova
 			// Return the point of intersection
 			return {x, y};
 		}
+
+		static inline const sf::Vector3f& const Normalize(const sf::Vector3f& p) 
+		{
+			float len = sqrtf(p.x * p.x + p.y * p.y + p.z * p.z);
+			return { p.x / len, p.y / len, p.z / len };
+		}
+
+		static inline const sf::Vector2f& const Normalize(const sf::Vector2f& p)
+		{
+			float len = sqrtf(p.x * p.x + p.y * p.y);
+			return { p.x / len, p.y / len };
+		}
 	};
 
 	class Plane 
 	{
 	private:
 		sf::Vector3f normal_;
+		sf::Vector3f point_;
+		float a_;
+		float b_;
+		float c_;
+		float d_;
 
 	public:
-		inline Plane(sf::Vector3f plane) 
+		inline Plane(sf::Vector3f point, sf::Vector3f normal) 
 		{
+			point_ = point;
+			normal_ = Math::Normalize(normal);
+			a_ = normal_.x;
+			b_ = normal_.y;
+			c_ = normal_.z;
+			d_ = -Math::DotProduct(point, normal);
 		}
 
-		inline float GetDistance() 
+		inline float Distance(sf::Vector3f p) const
 		{
+			return (a_ * p.x + b_ * p.y + c_ * p.z + d_);
 		}
 
-
+		inline const sf::Vector3f& Intersect(sf::Vector3f p1, sf::Vector3f p2) const
+		{
+			float ad = Math::DotProduct(p1, normal_);
+			float bd = Math::DotProduct(p2, normal_);
+			float t = (-d_ - ad) / (bd - ad);
+			return (p2 - p1) * t + p1;
+		}
 	};
 
 	class Slope 
@@ -641,12 +686,14 @@ namespace nova
 		void RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], class Texture* pixels, class sf::RenderTexture& minimap);
 		void RasterizeVerticalSlice(class Texture* pixels, const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
 		void RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
+		void RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture, const Point3D points[2], const sf::IntRect& portal_screen_space);
+
 		//void RasterizePseudoPlaneSlice(class Texture* pixels, float wall_z, const class Texture& floor_texture, const class Texture& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
 		void RasterizePolygon(class Texture* pixels, const class Point3D points[], int vertex_count, const class Texture& texture);
-		void RenderPlanes(class Texture* pixels, const class Node& render_node, const sf::Vector2f normalized_bounds[4]);
+		void RenderPlanes(class Texture* pixels, const class Node& render_node, class sf::RenderTexture& minimap);
 
-		//
-		int ClipTriangle(const class Point3D points[3], class Point3D* new_points[10]);
+		// returns the new number of verticies
+		int ClipPolygon(class Point3D points[], int num_points);
 
 
 		void RenderNodeActors(const class Node& node, class Texture* pixels, const sf::FloatRect& normalized_bounds);

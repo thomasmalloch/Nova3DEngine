@@ -123,7 +123,7 @@ void NovaEngine::Run()
 
 		// render floors and ceiling
 		for (auto* node : current_map_->nodes_)		
-			RenderPlanes(pixels, *node, { 0 });
+			RenderPlanes(pixels, *node, minimap);
 		
 		// render map
 		sf::Vector2f render_bounds[4] = { {0, 0}, {1.f, 0}, {1.f, 1.f}, {0.f, 1.f} };
@@ -257,15 +257,16 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 			{
 				// fix plane
 				sf::Vector2f intersect = Math::Intersect(f.far_[i].x, f.far_[i].y, f.near_[i].x, f.near_[i].y, xyz_wall_quad[1].x, xyz_wall_quad[1].z, xyz_wall_quad[0].x, xyz_wall_quad[0].z);
+				Slope u = Slope(uv_quad[1].x - uv_quad[0].x, xyz_wall_quad[1].x - xyz_wall_quad[0].x);
 				if (cross1 >= 0)
 				{
-					uv_quad[0].x = uv_quad[0].x + ((uv_quad[1].x - uv_quad[0].x) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (intersect.x - xyz_wall_quad[0].x);
+					uv_quad[0].x = u.Interpolate(uv_quad[0].x, intersect.x - xyz_wall_quad[0].x);
 					xyz_wall_quad[0].x = intersect.x;
 					xyz_wall_quad[0].z = intersect.y;
 				}
 				else if (cross2 >= 0)
 				{
-					uv_quad[1].x = uv_quad[0].x + ((uv_quad[1].x - uv_quad[0].x) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (intersect.x - xyz_wall_quad[0].x);
+					uv_quad[1].x = u.Interpolate(uv_quad[0].x, intersect.x - xyz_wall_quad[0].x);
 					xyz_wall_quad[1].x = intersect.x;
 					xyz_wall_quad[1].z = intersect.y;
 				}
@@ -351,58 +352,51 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 				{ xyz_wall_quad[3].x, portal_y_boundaries[3] }
 			};
 
-			/*std::thread* t = new std::thread(&NovaEngine::RenderMap, this, std::ref(next_node), render_node, render_bounds, pixels, std::ref(minimap), threads);
-			threads->push_back(t);*/
-			//t.join();
 			RenderMap(next_node, render_node, render_bounds, pixels, minimap);
 		}
 
-		// render floor/ceiling
-		/*std::thread t(&NovaEngine::RenderPlanes, this, pixels, render_node, normalized_bounds);
-		t.join();
-			t.*/
-		//RenderPlanes(pixels, render_node, normalized_bounds);
+		float dx = xyz_wall_quad[1].x - xyz_wall_quad[0].x;
+
+		Slope ya = Slope(xyz_wall_quad[1].y - xyz_wall_quad[0].y, dx);
+		Slope yb = Slope(xyz_wall_quad[2].y - xyz_wall_quad[3].y, dx);
+		Slope z_slope = Slope(xyz_wall_quad[1].z - xyz_wall_quad[0].z, dx);
+
+		Slope y_top = Slope(normalized_bounds[1].y - normalized_bounds[0].y, normalized_bounds[1].x - normalized_bounds[0].x);
+		Slope y_bottom = Slope(normalized_bounds[2].y - normalized_bounds[3].y, normalized_bounds[1].x - normalized_bounds[0].x);
+		
+		Slope w_slope = Slope(uv_quad[1].z - uv_quad[0].z, dx);
+		Slope u_slope = Slope(uv_quad[1].x - uv_quad[0].x, dx);
 
 		for (int x = x1; x < x2; x++) 
 		{
 			// normalize x
 			float nx = x / (float)width_;
 
-			/*float z = (x - x1) * (tz2 - tz1) / (x2 - x1) + tz1;
-			float brightness = (0.5f * -z + 100) / 100.f;
-			if (brightness < 0.2f)
-				brightness = 0.2f;
-			if (brightness > 1)
-				brightness = 1;
-
-			sf::Color colour = sf::Color(
-				(sf::Uint8)(wall->colour_.r * brightness),
-				(sf::Uint8)(wall->colour_.g * brightness),
-				(sf::Uint8)(wall->colour_.b * brightness));
-				*/
-
-			// linear interpolate y
-			int y1 = (xyz_wall_quad[0].y + ((xyz_wall_quad[1].y - xyz_wall_quad[0].y) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (nx - xyz_wall_quad[0].x)) * height_;
-			int y2 = (xyz_wall_quad[3].y + ((xyz_wall_quad[2].y - xyz_wall_quad[3].y) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (nx - xyz_wall_quad[0].x)) * height_;
-			int y_min = (normalized_bounds[0].y + ((normalized_bounds[1].y - normalized_bounds[0].y) / (normalized_bounds[1].x - normalized_bounds[0].x)) * (nx - normalized_bounds[0].x)) * height_;
-			int y_max = (normalized_bounds[3].y + ((normalized_bounds[2].y - normalized_bounds[3].y) / (normalized_bounds[1].x - normalized_bounds[0].x)) * (nx - normalized_bounds[0].x)) * height_;
+			// find y values
+			float dnx = nx - xyz_wall_quad[0].x;
+			int y1 = ya.Interpolate(xyz_wall_quad[0].y, dnx) * height_;
+			int y2 = yb.Interpolate(xyz_wall_quad[3].y, dnx) * height_;
+			int y_min = y_top.Interpolate(normalized_bounds[0].y, nx - normalized_bounds[0].x) * height_;
+			int y_max = y_bottom.Interpolate(normalized_bounds[3].y, nx - normalized_bounds[0].x) * height_;
 
 			// perspective correct u
-			float z = xyz_wall_quad[0].z + ((xyz_wall_quad[1].z - xyz_wall_quad[0].z) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (nx - xyz_wall_quad[0].x);
-			float w = (uv_quad[0].z + ((uv_quad[1].z - uv_quad[0].z) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (nx - xyz_wall_quad[0].x));
-			float u = (uv_quad[0].x + ((uv_quad[1].x - uv_quad[0].x) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (nx - xyz_wall_quad[0].x)) / w;			
+			float z = z_slope.Interpolate(xyz_wall_quad[0].z, dnx);
+			float w = w_slope.Interpolate(uv_quad[0].z, dnx);
+			float u = u_slope.Interpolate(uv_quad[0].x, dnx) / w;
+
 			sf::FloatRect uv = sf::FloatRect(u, 0, uv_quad[0].y, uv_quad[3].y);
 			
 			// fix wall tex coords
+			Slope v = Slope(uv.height - uv.top, (float)(y2 - y1));
 			if (y_min > y1)
 			{
-				uv.top = uv.top + ((uv.height - uv.top) / (float)(y2 - y1)) * (float)(y_min - y1);
+				uv.top = v.Interpolate(uv.top, (float)(y_min - y1));
 				y1 = y_min;
 			}
 
 			if (y_max < y2)
 			{
-				uv.height = uv.top + ((uv.height - uv.top) / (y2 - y1)) * (y_max - y1);
+				uv.height = v.Interpolate(uv.top, (float)(y_max - y1));
 				y2 = y_max;
 			}
 
@@ -419,14 +413,24 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 				portal_y_max = y_max;
 
 			// render wall			
-			RasterizeVerticalSlice(pixels, *wall->wall_texture_, uv, wall_screen_space, { 0, portal_y_min, 0, portal_y_max - portal_y_min });
+			Point3D points[2] =
+			{ 
+				{ {(float)x, (float)y1, z}, {uv.left, uv.top, 1 } },
+				{ {(float)x, (float)y2 + 2, z}, {uv.width, uv.height, 1} }
+			};
+
+			RasterizeVerticalSlice(
+				pixels,
+				*wall->wall_texture_,
+				points,
+				{ 0, portal_y_min + 1, 0, portal_y_max - portal_y_min - 2 } );
 		}
 	}
 
 	minimap.draw(&lines[0], lines.size(), sf::Lines);
 }
 
-void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_node, const sf::Vector2f normalized_bounds[4])
+void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_node, class sf::RenderTexture& minimap)
 {
 	// render the floor/ceiling. this uses actual 3d projection!
 	// floor
@@ -444,6 +448,26 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 		plane_polygon[i].xyz_.x = plane_polygon[i].xyz_.x * camera_->GetSinAngle() - plane_polygon[i].xyz_.y * camera_->GetCosAngle();
 	}
 
+	// clip
+	int vertices = ClipPolygon(plane_polygon, render_node.plane_xy_.size());
+	if (vertices == 0)
+		return;
+
+	// draw floor on minimap
+	sf::Vertex tri[6];
+	for (int i = 0; i < vertices - 3 + 1; i++) 
+	{
+		tri[0] = sf::Vertex(sf::Vector2f(width_ / 8.f - plane_polygon[0].xyz_.x, height_ / 4.f - plane_polygon[0].xyz_.z), sf::Color(255,255,0, 50));
+		tri[1] = sf::Vertex(sf::Vector2f(width_ / 8.f - plane_polygon[1 + i].xyz_.x, height_ / 4.f - plane_polygon[1 + i].xyz_.z), sf::Color(255, 255, 0, 50));
+													    
+		tri[2] = sf::Vertex(sf::Vector2f(width_ / 8.f - plane_polygon[1 + i].xyz_.x, height_ / 4.f - plane_polygon[1 + i].xyz_.z), sf::Color(255, 255, 0, 50));
+		tri[3] = sf::Vertex(sf::Vector2f(width_ / 8.f - plane_polygon[2 + i].xyz_.x, height_ / 4.f - plane_polygon[2 + i].xyz_.z), sf::Color(255, 255, 0, 50));
+													    
+		tri[4] = sf::Vertex(sf::Vector2f(width_ / 8.f - plane_polygon[2 + i].xyz_.x, height_ / 4.f - plane_polygon[2 + i].xyz_.z), sf::Color(255, 255, 0, 50));
+		tri[5] = sf::Vertex(sf::Vector2f(width_ / 8.f - plane_polygon[0].xyz_.x, height_ / 4.f - plane_polygon[0].xyz_.z), sf::Color(255, 255, 0, 50));
+		minimap.draw(tri, 6, sf::PrimitiveType::Lines);
+	}
+
 	sf::Vector2f scale = camera_->GetScale();
 	float floor = render_node.floor_height_ - camera_->GetPosition().z;
 	float ceiling = render_node.ceiling_height_ - camera_->GetPosition().z;
@@ -451,7 +475,7 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 	float half_width = 0.5f * width_;
 
 	float ceiling_y[100];
-	for (int i = 0; i < render_node.plane_xy_.size(); i++)
+	for (int i = 0; i < vertices; i++)
 	{
 		// xyz
 		plane_polygon[i].xyz_.y = (half_height - floor * scale.y / plane_polygon[i].xyz_.z) / height_;
@@ -465,13 +489,15 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 	}
 
 	// render floor
-	RasterizePolygon(pixels, plane_polygon, render_node.plane_xy_.size(), *render_node.floor_texture_);
+	if(vertices > 0)
+		RasterizePolygon(pixels, &plane_polygon[0], vertices, *render_node.floor_texture_);
 
 	// render ceiling
-	for (int i = 0; i < render_node.plane_xy_.size(); i++)
+	for (int i = 0; i < vertices; i++)
 		plane_polygon[i].xyz_.y = ceiling_y[i];
 
-	RasterizePolygon(pixels, plane_polygon, render_node.plane_xy_.size(), *render_node.ceiling_texture_);
+	if (vertices > 0)
+		RasterizePolygon(pixels, &plane_polygon[0], vertices, *render_node.ceiling_texture_);
 }
 
 void NovaEngine::RasterizeVerticalSlice(class Texture* pixels, const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space)
@@ -567,8 +593,8 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 
 					depth_buffer[x + y * width_] = tex_w;
 					sf::Color colour = texture.GetPixel(
-						(int)(tex_u / tex_w * texture.GetWidth()) % texture.GetWidth(),
-						(int)(tex_v / tex_w * texture.GetHeight()) % (texture.GetHeight()));
+						Math::Clamp(0, texture.GetWidth(), (int)(tex_u / tex_w * texture.GetWidth()) % texture.GetWidth()),
+						Math::Clamp(0, texture.GetHeight(), (int)(tex_v / tex_w * texture.GetHeight()) % (texture.GetHeight())));
 
 					pixels->SetPixel(x, y, colour);
 					t += tstep;
@@ -622,18 +648,43 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 						continue;
 
 					depth_buffer[x + y * width_] = tex_w;
-
 					sf::Color colour = texture.GetPixel(
-						(int)(tex_u / tex_w * texture.GetWidth()) % texture.GetWidth(),
-						(int)(tex_v / tex_w * texture.GetHeight()) % (texture.GetHeight()));
+						Math::Clamp(0, texture.GetWidth(), (int)(tex_u / tex_w * texture.GetWidth()) % texture.GetWidth()),
+						Math::Clamp(0, texture.GetHeight(), (int)(tex_v / tex_w * texture.GetHeight()) % (texture.GetHeight())));
 
 					pixels->SetPixel(x, y, colour);
-
-
 					t += tstep;
 				}
 			}
 		}
+	}
+}
+
+void NovaEngine::RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture, const Point3D points[2], const sf::IntRect& portal_screen_space) 
+{
+	if (points[0].xyz_.y == INT_MIN || points[1].xyz_.y == INT_MIN)
+		return;
+
+	int x = points[0].xyz_.x;
+	int u = (int)(points[0].uvw_.x * texture.GetWidth()) % texture.GetWidth();
+	int y1 = Math::Clamp(0, height_, points[0].xyz_.y);
+	int y2 = Math::Clamp(0, height_, points[1].xyz_.y);
+
+	Slope v_slope = Slope(points[1].uvw_.y - points[0].uvw_.y, points[1].xyz_.y - points[0].xyz_.y);
+	for (int y = y1; y < y2; y++)
+	{
+		if ((y >= portal_screen_space.top) && (y <= (portal_screen_space.top + portal_screen_space.height)))
+			y = portal_screen_space.top + portal_screen_space.height + 1;
+
+		if ((y < y1) || (y >= y2))
+			break;
+
+		if (depth_buffer[x + y * width_] == FLT_MAX)
+			depth_buffer[x + y * width_] = points[0].xyz_.z;
+
+		int v = (int)(v_slope.Interpolate(points[0].uvw_.y, y - points[0].xyz_.y) * texture.GetHeight()) % texture.GetHeight();
+		sf::Color colour = texture.GetPixel(u, v);
+		pixels->SetPixel(x, y, colour);
 	}
 }
 
@@ -644,13 +695,13 @@ void NovaEngine::RasterizeVerticalSlice(class Texture* pixels, const class Textu
 	
 	int u = (int)(uv.left * texture.GetWidth()) % texture.GetWidth();
 	int y1 = Math::Clamp(0, height_, screen_space.top);
-	int y2 = Math::Clamp(0, height_ + 1, screen_space.top + screen_space.height + 1);
+	int y2 = Math::Clamp(0, height_, screen_space.top + screen_space.height);
 	for (int y = y1; y < y2; y++)
 	{
 		if ((y >= portal_screen_space.top) && (y <= (portal_screen_space.top + portal_screen_space.height)))
 			y = portal_screen_space.top + portal_screen_space.height + 1;
 
-		if ((y < y1) || (y > y2))
+		if ((y < y1) || (y >= y2))
 			break;
 
 		/*if (depth_buffer[x + y * width_] < tex_w)
@@ -664,13 +715,104 @@ void NovaEngine::RasterizeVerticalSlice(class Texture* pixels, const class Textu
 	}
 }
 
-int NovaEngine::ClipTriangle(const class Point3D points[3], class Point3D* new_points[10]) 
+int NovaEngine::ClipPolygon(class Point3D points[], int num_points)
 {
-	int num_added = 0;
+	Point3D new_points[100];
+	int poly_count = num_points;
+	int clipped_count = 0;
 
+	Plane planes[3] =
+	{
+		//far
+		//Plane({ 0, 0, 100.f }, { 0, 0, -1 }),
+		//left
+		Plane({ -1, 0, 1 }, { 1, 0, 1 }),
+		//right
+		Plane({ 1, 0, 1 }, { -1, 0, 1 }),
+		//near
+		Plane({ 0, 0, 0.1f }, { 0, 0, 1 }),
+	};
 
-	return num_added;
+	for (auto &plane : planes) 
+	{
+		clipped_count = 0;
+		for (int i = 0; i < poly_count; i++)
+		{
+			Point3D current = points[i];
+			Point3D next = points[(i + 1) % poly_count];
+
+			float cross1 = plane.Distance(current.xyz_);
+			float cross2 = plane.Distance(next.xyz_);
+
+			if (cross1 >= 0 && cross2 >= 0)
+			{
+				new_points[clipped_count++] = next;
+				continue;
+			}
+			else if (cross1 < 0 && cross2 >= 0) 
+			{
+				sf::Vector3f intersect = plane.Intersect(current.xyz_, next.xyz_);
+
+				Slope u = Slope(next.uvw_.x - current.uvw_.x, next.xyz_.x - current.xyz_.x);
+				Slope v = Slope(next.uvw_.y - current.uvw_.y, next.xyz_.z - current.xyz_.z);
+
+				Point3D intersecting_point;
+				intersecting_point.uvw_.x = u.Interpolate(current.uvw_.x, intersect.x - current.xyz_.x);
+				intersecting_point.uvw_.y = v.Interpolate(current.uvw_.y, intersect.z - current.xyz_.z);
+				intersecting_point.xyz_.x = intersect.x;
+				intersecting_point.xyz_.z = intersect.z;
+				intersecting_point.xyz_.y = current.xyz_.y;
+
+				new_points[clipped_count++] = intersecting_point;
+				new_points[clipped_count++] = next;
+			}
+			else if (cross1 >= 0 && cross2 < 0) 
+			{
+				sf::Vector3f intersect = plane.Intersect(current.xyz_, next.xyz_);
+
+				Slope u = Slope(next.uvw_.x - current.uvw_.x, next.xyz_.x - current.xyz_.x);
+				Slope v = Slope(next.uvw_.y - current.uvw_.y, next.xyz_.z - current.xyz_.z);
+
+				Point3D intersecting_point;
+				intersecting_point.uvw_.x = u.Interpolate(current.uvw_.x, intersect.x - current.xyz_.x);
+				intersecting_point.uvw_.y = v.Interpolate(current.uvw_.y, intersect.z - current.xyz_.z);
+				intersecting_point.xyz_.x = intersect.x;
+				intersecting_point.xyz_.z = intersect.z;
+				intersecting_point.xyz_.y = current.xyz_.y;
+
+				new_points[clipped_count++] = intersecting_point;
+			}
+		}
+
+		poly_count = clipped_count;
+		for (int i = 0; i < poly_count; i++)
+			points[i] = new_points[i];
+	}
+
+	return clipped_count;
 }
+
+/*
+sf::Vector2f intersect = Math::Intersect(f.far_[i].x, f.far_[i].y, f.near_[i].x, f.near_[i].y, p2.xyz_.x, p2.xyz_.z, p1.xyz_.x, p1.xyz_.z);
+Slope u = Slope(p2.uvw_.x - p1.uvw_.x, p2.xyz_.x - p1.xyz_.x);
+Slope v = Slope(p2.uvw_.y - p1.uvw_.y, p2.xyz_.z - p1.xyz_.z);
+if (cross1 >= 0)
+{
+	p1.uvw_.x = u.Interpolate(p1.uvw_.x, intersect.x - p1.xyz_.x);
+	p1.uvw_.y = v.Interpolate(p1.uvw_.y, intersect.y - p1.xyz_.z);
+	p1.xyz_.x = intersect.x;
+	p1.xyz_.z = intersect.y;
+}
+else if (cross2 >= 0)
+{
+	p2.uvw_.x = u.Interpolate(p1.uvw_.x, intersect.x - p1.xyz_.x);
+	p2.uvw_.y = v.Interpolate(p1.uvw_.y, intersect.y - p1.xyz_.z);
+	p2.xyz_.x = intersect.x;
+	p2.xyz_.z = intersect.y;
+}
+
+
+*/
 
 void RasterizePseudoPlaneSlice(
 	class Texture* pixels,

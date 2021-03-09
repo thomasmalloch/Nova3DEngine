@@ -23,6 +23,23 @@ Camera::~Camera()
 
 void Camera::UpdateWallClippingPlanes() 
 {
+	float x1 = 1.f * cosf(-fov_half_);
+	float z1 = 1.f * sinf(-fov_half_);
+	float x2 = 0.1f * cosf(-fov_half_);
+	float z2 = 0.1f * sinf(-fov_half_);	
+	Plane left = Plane({ x1, 0, z1 }, {});
+
+	x1 = 0.1f * cosf(fov_half_);
+	z1 = 0.1f * sinf(fov_half_);
+	x2 = 1.f * cosf(fov_half_);
+	z2 = 1.f * sinf(fov_half_);
+	Plane right = Plane({ x1, 0, z1 }, {});
+
+
+	Plane near = Plane({ 0, 0, 0.1f }, {0, 0, 1});
+
+	// should we add a far?
+
 	wall_clipping_planes_->near_[0].x = 1000.f * cosf(-fov_half_);
 	wall_clipping_planes_->near_[0].y = 1000.f * sinf(-fov_half_);
 	wall_clipping_planes_->far_[0].x = 0.1f * cosf(-fov_half_);
