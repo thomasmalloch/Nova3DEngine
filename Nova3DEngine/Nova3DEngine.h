@@ -3,6 +3,7 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/System.hpp>
 #include <SFML/Audio.hpp>
+#include <SFML/OpenGL.hpp>
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -318,13 +319,6 @@ namespace nova
 
 #pragma region Portal Renderer
 
-	class Frustum
-	{
-	public:
-		sf::Vector2f far_[2];
-		sf::Vector2f near_[2];
-	};
-
 	class Camera
 	{
 	private:
@@ -343,11 +337,9 @@ namespace nova
 		float sin_angle_;
 
 		class Node* current_node_;
+		class std::vector<Plane> clipping_planes_;
 
-		class Frustum* wall_clipping_planes_;
-		class Frustum* pseudo_plane_frustrum_;
-
-		void UpdateWallClippingPlanes();
+		void UpdateClippingPlanes();
 
 	public:
 		
@@ -359,15 +351,19 @@ namespace nova
 		void SetFOVDegrees(float fov_degrees);
 		void SetFOVRadians(float fov_rad);
 		void SetCurrentNode(class Node* node);
+		void SetNear(float camera_near);
+		void SetFar(float camera_far);
 
 		const sf::Vector2f& GetScale();	
 		class Node* GetCurrentNode();
-		const class Frustum& GetWallClippingPlanes();
+		const std::vector<Plane>& GetClippingPlanes() const;
 		float GetFOV();
 		float GetFOVHalf();
 		float GetAngle();
 		float GetCosAngle();
 		float GetSinAngle();
+		float GetNear();
+		float GetFar();
 		const sf::Vector3f& GetPosition();
 
 		sf::Vector2f Project(sf::Vector3f p);
@@ -390,9 +386,10 @@ namespace nova
 	};
 
 	struct Point3D
-	{
+	{		
 		sf::Vector3f xyz_;
-		sf::Vector3f uvw_;
+		sf::Vector3f uvw_;		
+		sf::Vector3f original_position_;
 	};
 
 	struct Triangle 
@@ -436,7 +433,7 @@ namespace nova
 			delete[] data_;
 		}
 
-		inline const sf::Vector2u GetSize() const
+		inline const sf::Vector2u& GetSize() const
 		{
 			return size_;		
 		}
@@ -451,19 +448,19 @@ namespace nova
 			return size_.y;
 		}
 
-		inline const sf::Color GetPixel(unsigned int x, unsigned int y) const
+		inline const sf::Color& GetPixel(unsigned int x, unsigned int y) const
 		{
 			int offset = (x + y * size_.x) * 4;
-			return
-			{
+			return sf::Color
+			(
 				data_[offset + 0],
 				data_[offset + 1],
 				data_[offset + 2],
-				data_[offset + 3],
-			};
+				data_[offset + 3]
+			);
 		}
 
-		inline void SetPixel(int x, int y, const sf::Color colour) 
+		inline void SetPixel(int x, int y, const sf::Color& colour) 
 		{
 			int offset = (x + y * size_.x) * 4;
 			data_[offset + 0] = colour.r;
@@ -472,9 +469,27 @@ namespace nova
 			data_[offset + 3] = colour.a;
 		}
 
+
+		inline void SetPixel(int x, int y, sf::Uint8 r, sf::Uint8 g, sf::Uint8 b)
+		{
+			int offset = (x + y * size_.x) * 4;
+			data_[offset + 0] = r;
+			data_[offset + 1] = g;
+			data_[offset + 2] = b;
+			data_[offset + 3] = 255;
+		}
+
+		/*inline void SetPixel(int x, int y, sf::Uint8 c[])
+		{
+			int offset = (x + y * size_.x) * 4;
+			data_[offset + 0] = c[0];
+			data_[offset + 1] = c[1];
+			data_[offset + 2] = c[2];
+			data_[offset + 3] = 255;
+		}
+		*/
 		inline void Clear() 
 		{
-			// back with full alpha
 			memset(&data_[0], 0xff000000, size_.x * size_.y * 4);
 		}
 
@@ -549,6 +564,23 @@ namespace nova
 		float ambient_light_;
 	};
 
+	class Light
+	{
+	public:
+		sf::Vector3f position_;
+		sf::Color colour_;
+		float intensity_;
+
+		Light(sf::Color colour, sf::Vector3f position)
+			: colour_(colour), intensity_(1.f), position_(position)
+		{
+		}
+
+		inline float GetDistance(sf::Vector3f p) const
+		{
+			return std::sqrtf((position_.x - p.x) * (position_.x - p.x) + (position_.y - p.y) * (position_.y - p.y) + (position_.z - p.z) * (position_.z - p.z));
+		}
+	};
 
 #pragma endregion
 
@@ -578,6 +610,7 @@ namespace nova
 	class IUIButton : public IUserInterfaceControl
 	{
 	};
+	
 
 #pragma endregion
 
@@ -638,7 +671,7 @@ namespace nova
 		// Engine Methods
 		////////////////////////////////////////////////
 		/// Function that sets up the game window
-		bool Setup( int width, int height, int pixel_scale, bool fullscreen );
+		bool Setup(int width, int height, int pixel_scale, bool fullscreen );
 		// Runs the game
 		void Run();
 		// Ends the game
@@ -683,14 +716,24 @@ namespace nova
 	protected:
 	private:
 		// private functions
-		void RenderMap(const class Node& render_node, const class Node& last_node, const sf::Vector2f normalized_bounds[4], class Texture* pixels, class sf::RenderTexture& minimap);
-		void RasterizeVerticalSlice(class Texture* pixels, const class sf::Color& colour, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
-		void RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture, const sf::FloatRect& uv, const sf::IntRect& screen_space, const sf::IntRect& portal_screen_space);
-		void RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture, const Point3D points[2], const sf::IntRect& portal_screen_space);
+		// renders the verticle walls of the map
+		void RenderMap(const class Node& render_node, const class Node& last_node,
+			const sf::Vector2f normalized_bounds[4],
+			class Texture* pixels, class sf::RenderTexture& minimap);
 
-		//void RasterizePseudoPlaneSlice(class Texture* pixels, float wall_z, const class Texture& floor_texture, const class Texture& ceiling_texture, const sf::IntRect& ceiling_screen_space, const sf::IntRect& wall_screen_space, const sf::IntRect& floor_screen_space);
+		void RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture,
+			const Point3D points[2], const sf::IntRect& portal_screen_space);
+
+		// renders the floors and ceiling
 		void RasterizePolygon(class Texture* pixels, const class Point3D points[], int vertex_count, const class Texture& texture);
 		void RenderPlanes(class Texture* pixels, const class Node& render_node, class sf::RenderTexture& minimap);
+
+		// plots a texel to the pixel texture.
+		// also applies fog and lighting
+		inline void DrawPixel(
+			class Texture* pixels, int x, int y,
+			float u, float v, const Texture& texture,
+			float z, sf::Vector3f map_coordinate);
 
 		// returns the new number of verticies
 		int ClipPolygon(class Point3D points[], int num_points);
@@ -715,6 +758,12 @@ namespace nova
 		int height_;
 		bool is_fullscreen_;
 		float* depth_buffer;
+
+		sf::Color fog_colour_;
+		float fog_occlusion_distance_;
+		float fog_density_;
+
+		std::vector<Light*> lights_;
 
 		bool is_running_ = false;
 	};
