@@ -448,16 +448,27 @@ namespace nova
 			return size_.y;
 		}
 
+		inline const sf::Color& GetPixel(int index) const 
+		{
+			return
+			{
+				data_[index + 0],
+				data_[index + 1],
+				data_[index + 2],
+				data_[index + 3]
+			};
+		}
+
 		inline const sf::Color& GetPixel(unsigned int x, unsigned int y) const
 		{
 			int offset = (x + y * size_.x) * 4;
-			return sf::Color
-			(
+			return 
+			{
 				data_[offset + 0],
 				data_[offset + 1],
 				data_[offset + 2],
 				data_[offset + 3]
-			);
+			};
 		}
 
 		inline void SetPixel(int x, int y, const sf::Color& colour) 
@@ -468,7 +479,6 @@ namespace nova
 			data_[offset + 2] = colour.b;
 			data_[offset + 3] = colour.a;
 		}
-
 
 		inline void SetPixel(int x, int y, sf::Uint8 r, sf::Uint8 g, sf::Uint8 b)
 		{
@@ -576,9 +586,14 @@ namespace nova
 		{
 		}
 
-		inline float GetDistance(sf::Vector3f p) const
+		inline float GetDistance(const sf::Vector3f &p) const
 		{
-			return std::sqrtf((position_.x - p.x) * (position_.x - p.x) + (position_.y - p.y) * (position_.y - p.y) + (position_.z - p.z) * (position_.z - p.z));
+			return GetDistance(p.x, p.y, p.z);
+		}
+
+		inline float GetDistance(float x, float y, float z) const
+		{
+			return std::sqrtf((position_.x - x) * (position_.x - x) + (position_.y - y) * (position_.y - y) + (position_.z - z) * (position_.z - z));
 		}
 	};
 
@@ -731,13 +746,12 @@ namespace nova
 		// plots a texel to the pixel texture.
 		// also applies fog and lighting
 		inline void DrawPixel(
-			class Texture* pixels, int x, int y,
-			float u, float v, const Texture& texture,
-			float z, sf::Vector3f map_coordinate);
+			class Texture *pixels, int x, int y,
+			float u, float v, const class Texture &texture,
+			float z, float map_x, float map_y, float map_z);
 
 		// returns the new number of verticies
 		int ClipPolygon(class Point3D points[], int num_points);
-
 
 		void RenderNodeActors(const class Node& node, class Texture* pixels, const sf::FloatRect& normalized_bounds);
 		void RenderUI();
@@ -764,6 +778,7 @@ namespace nova
 		float fog_density_;
 
 		std::vector<Light*> lights_;
+		std::vector<Light*> translated_lights_;
 
 		bool is_running_ = false;
 	};

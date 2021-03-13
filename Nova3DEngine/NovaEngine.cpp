@@ -32,16 +32,18 @@ bool NovaEngine::Setup(int width, int height, int pixel_scale, bool fullscreen)
 	camera_ = new Camera(width_, height_);
 	ui_root_ = nullptr;
 	fog_colour_ = sf::Color(0x11, 0x11, 0x22);
-	fog_occlusion_distance_ = 250;
+	fog_occlusion_distance_ = 150;
 	fog_density_ = logf(255) / logf(fog_occlusion_distance_);
 		
-
-	Light* l1 = new Light(sf::Color::White, { 160, 10, 60 });
-	Light* l2 = new Light(sf::Color::White, { 350, 10, 60 });
-	Light* l3 = new Light(sf::Color::White, { 260, 10, 180 });
+	
+	Light* l1 = new Light(sf::Color::Magenta, { 170, 70, 10 });
+	Light* l2 = new Light(sf::Color::Red, { 340, 70, 10 });
+	Light* l3 = new Light(sf::Color::Green, { 340, 210, 10 });
+	Light* l4 = new Light(sf::Color::Blue, { 170, 210, 10 });
 	lights_.push_back(l1);
 	lights_.push_back(l2);
 	lights_.push_back(l3);
+	lights_.push_back(l4);
 
 	UserLoad();
 	if (!camera_->GetCurrentNode()) 
@@ -84,7 +86,14 @@ void NovaEngine::Run()
 	sf::Sprite ui_drawable;
 	ui_drawable.setScale(pixel_scale_, pixel_scale_);
 
+	sf::RectangleShape clear;
+	clear.setFillColor(fog_colour_);
+	clear.setSize({ (float)width_, (float)height_ });
+
 	unsigned int framerate = 0;
+	/*for (auto light : lights_)
+		translated_lights_.push_back(new Light(light->colour_, light->position_));*/
+
 	while (render_window_->isOpen()) 
 	{
 		// process input
@@ -129,13 +138,24 @@ void NovaEngine::Run()
 		// clear
 		ui.clear(sf::Color::Transparent);
 		minimap.clear(sf::Color(0, 0, 0, 200));
-		render_window_->clear(sf::Color::Black);
+		render_window_->draw(clear);
 		memset(depth_buffer, FLT_MAX, width_ * height_ * sizeof(float));		
 		for (int x = 0; x < width_; x++)
 		{
 			for (int y = 0; y < height_; y++)
 				pixels->SetPixel(x, y, fog_colour_);
 		}
+		
+		// translate lights
+		/*for (int i = 0; i < lights_.size(); i++) 
+		{
+			translated_lights_[i]->position_.x = lights_[i]->position_.x - camera_->GetPosition().x;
+			translated_lights_[i]->position_.y = lights_[i]->position_.y - camera_->GetPosition().y;
+			translated_lights_[i]->position_.z = lights_[i]->position_.z - camera_->GetPosition().z;
+
+			translated_lights_[i]->position_.z = translated_lights_[i]->position_.x * camera_->GetCosAngle() + translated_lights_[i]->position_.y * camera_->GetSinAngle();
+			translated_lights_[i]->position_.x = translated_lights_[i]->position_.x * camera_->GetSinAngle() - plane_polygon[i].xyz_.y * camera_->GetCosAngle();
+		}*/
 
 		// render floors and ceiling
 		for (auto* node : current_map_->nodes_)		
@@ -200,6 +220,9 @@ void NovaEngine::Run()
 void NovaEngine::End() 
 {
 	is_running_ = false;
+	for (int i = 0; i < lights_.size(); i++)
+		delete lights_[i];
+
 	UserUnload();
 }
 
@@ -230,37 +253,30 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 		if (tz1 <= 0 && tz2 <= 0)
 			continue;	
 
-		sf::Vector3f xyz_wall_quad[4] =
-		{
-			{ tx1, ty1, tz1 },
-			{ tx2, ty2, tz2 },
-			{ 0, 0, 0 },
-			{ 0, 0, 0 }
-		};
+		// wall facing the wrong way
+		/*if (tx1 > tx2)
+			continue;*/
 
-		sf::Vector3f uv_quad[4] =
+		Point3D points[4] = 
 		{
-			{ wall->uv1_.x, wall->uv1_.y, 1.f },
-			{ wall->uv2_.x, wall->uv2_.y, 1.f },
-			{ wall->uv1_.x, wall->uv1_.y, 1.f },
-			{ wall->uv2_.x, wall->uv2_.y, 1.f }
+			{ {tx1, ty1, tz1},	{ wall->uv1_.x, wall->uv1_.y, 1.f },	{ wall->p1_.x, wall->p1_.y, 0 } },
+			{ {tx2, ty2, tz2},	{ wall->uv2_.x, wall->uv2_.y, 1.f },	{ wall->p2_.x, wall->p2_.y, 0 } },
+			{ {0, 0, 0},		{ wall->uv2_.x, wall->uv2_.y, 1.f },	{ wall->p2_.x, wall->p2_.y, 0 } },
+			{ {0, 0, 0},		{ wall->uv1_.x, wall->uv1_.y, 1.f },	{ wall->p1_.x, wall->p1_.y, 0 } },
 		};
-
-		if ((xyz_wall_quad[0].z) <= 0 && (xyz_wall_quad[1].z <= 0))
-			continue;
 
 		// draw potentially out of frustum walls on minimap
 		sf::Color wall_colour = (wall->IsPortal()) ? sf::Color(255, 0, 0, 25) : sf::Color(255, 255, 255, 50);
-		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - xyz_wall_quad[0].x, height_ / 4.f - xyz_wall_quad[0].z), wall_colour));
-		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - xyz_wall_quad[1].x, height_ / 4.f - xyz_wall_quad[1].z), wall_colour));
+		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - points[0].xyz_.x, height_ / 4.f - points[0].xyz_.z), wall_colour));
+		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - points[1].xyz_.x, height_ / 4.f - points[1].xyz_.z), wall_colour));
 
 		// clip
 		bool is_needing_to_render = true;
 		for (auto &plane : camera_->GetClippingPlanes()) 
 		{
 			// see if we need to clip
-			float cross1 = plane.Distance(xyz_wall_quad[0]);
-			float cross2 = plane.Distance(xyz_wall_quad[1]);
+			float cross1 = plane.Distance(points[0].xyz_);
+			float cross2 = plane.Distance(points[1].xyz_);
 
 			// wall outside of plane, don't render
 			if ((cross1 < 0) && (cross2 < 0))
@@ -271,19 +287,25 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 
 			if (cross1 < 0 || cross2 < 0)
 			{		
-				sf::Vector3f intersect = plane.Intersect(xyz_wall_quad[0], xyz_wall_quad[1]);
-				Slope u = Slope(uv_quad[1].x - uv_quad[0].x, xyz_wall_quad[1].x - xyz_wall_quad[0].x);
+				sf::Vector3f intersect = plane.Intersect(points[0].xyz_, points[1].xyz_);
+				Slope u = Slope(points[1].uvw_.x - points[0].uvw_.x, points[1].xyz_.x - points[0].xyz_.x);
+				Slope x = Slope(points[1].original_position_.x - points[0].original_position_.x, points[1].xyz_.x - points[0].xyz_.x);
+				Slope y = Slope(points[1].original_position_.y - points[0].original_position_.y, points[1].xyz_.z - points[0].xyz_.z);
 				if (cross1 < 0)
 				{
-					uv_quad[0].x = u.Interpolate(uv_quad[0].x, intersect.x - xyz_wall_quad[0].x);
-					xyz_wall_quad[0].x = intersect.x;
-					xyz_wall_quad[0].z = intersect.z;
+					points[0].uvw_.x = u.Interpolate(points[0].uvw_.x, intersect.x - points[0].xyz_.x);
+					points[0].original_position_.x = x.Interpolate(points[0].original_position_.x, intersect.x - points[0].xyz_.x);
+					points[0].original_position_.y = y.Interpolate(points[0].original_position_.y, intersect.z - points[0].xyz_.z);
+					points[0].xyz_.x = intersect.x;
+					points[0].xyz_.z = intersect.z;
 				}
 				else if (cross2 < 0)
 				{
-					uv_quad[1].x = u.Interpolate(uv_quad[0].x, intersect.x - xyz_wall_quad[0].x);
-					xyz_wall_quad[1].x = intersect.x;
-					xyz_wall_quad[1].z = intersect.z;
+					points[1].uvw_.x = u.Interpolate(points[0].uvw_.x, intersect.x - points[0].xyz_.x);
+					points[1].original_position_.x = x.Interpolate(points[0].original_position_.x, intersect.x - points[0].xyz_.x);
+					points[1].original_position_.y = y.Interpolate(points[0].original_position_.y, intersect.z - points[0].xyz_.z);
+					points[1].xyz_.x = intersect.x;
+					points[1].xyz_.z = intersect.z;
 				}
 			}
 		}
@@ -291,13 +313,13 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 		if (!is_needing_to_render)
 			continue;
 
-		xyz_wall_quad[3] = xyz_wall_quad[0];
-		xyz_wall_quad[2] = xyz_wall_quad[1];
+		points[3].xyz_ = points[0].xyz_;
+		points[2].xyz_ = points[1].xyz_;
 
 		// draw clipped walls on minimap
 		wall_colour = (wall->IsPortal()) ? sf::Color(255, 0, 0, 50) : sf::Color::White;
-		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - xyz_wall_quad[0].x, height_ / 4.f - xyz_wall_quad[0].z), wall_colour));
-		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - xyz_wall_quad[1].x, height_ / 4.f - xyz_wall_quad[1].z), wall_colour));
+		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - points[0].xyz_.x, height_ / 4.f - points[0].xyz_.z), wall_colour));
+		lines.push_back(sf::Vertex(sf::Vector2f(width_ / 8.f - points[1].xyz_.x, height_ / 4.f - points[1].xyz_.z), wall_colour));
 
 		// perspective transform and normalize
 		if (wall->texture_height_pixels_ == 0)
@@ -309,36 +331,36 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 		float half_height = 0.5f * height_;
 		float half_width = 0.5f * width_;
 
-		uv_quad[3].y = (ceiling - floor) / wall->texture_height_pixels_;
-		uv_quad[2].y = (ceiling - floor) / wall->texture_height_pixels_;
+		points[3].uvw_.y = (ceiling - floor) / wall->texture_height_pixels_;
+		points[2].uvw_.y = (ceiling - floor) / wall->texture_height_pixels_;
 
 		// wall projection
-		xyz_wall_quad[0].y = (half_height - ceiling * scale.y / xyz_wall_quad[0].z)  / height_;
-		xyz_wall_quad[1].y = (half_height - ceiling * scale.y / xyz_wall_quad[1].z)  / height_;
-		xyz_wall_quad[2].y = (half_height - floor *   scale.y / xyz_wall_quad[2].z)  / height_;
-		xyz_wall_quad[3].y = (half_height - floor *   scale.y / xyz_wall_quad[3].z)  / height_;
-											   
-		xyz_wall_quad[0].x = (half_width - xyz_wall_quad[0].x * scale.x / xyz_wall_quad[0].z) / width_;
-		xyz_wall_quad[1].x = (half_width - xyz_wall_quad[1].x * scale.x / xyz_wall_quad[1].z) / width_;
-		xyz_wall_quad[2].x = (half_width - xyz_wall_quad[2].x * scale.x / xyz_wall_quad[2].z) / width_;
-		xyz_wall_quad[3].x = (half_width - xyz_wall_quad[3].x * scale.x / xyz_wall_quad[3].z) / width_;
+		points[0].xyz_.y = (half_height - ceiling * scale.y / points[0].xyz_.z)  / height_;
+		points[1].xyz_.y = (half_height - ceiling * scale.y / points[1].xyz_.z)  / height_;
+		points[2].xyz_.y = (half_height - floor *   scale.y / points[2].xyz_.z)  / height_;
+		points[3].xyz_.y = (half_height - floor *   scale.y / points[3].xyz_.z)  / height_;
+					   
+		points[0].xyz_.x = (half_width - points[0].xyz_.x * scale.x / points[0].xyz_.z) / width_;
+		points[1].xyz_.x = (half_width - points[1].xyz_.x * scale.x / points[1].xyz_.z) / width_;
+		points[2].xyz_.x = (half_width - points[2].xyz_.x * scale.x / points[2].xyz_.z) / width_;
+		points[3].xyz_.x = (half_width - points[3].xyz_.x * scale.x / points[3].xyz_.z) / width_;
 
 		// wall uv perspective correction
-		uv_quad[0].x /= xyz_wall_quad[0].z;
-		uv_quad[1].x /= xyz_wall_quad[1].z;
-		uv_quad[2].x /= xyz_wall_quad[2].z;
-		uv_quad[3].x /= xyz_wall_quad[3].z;
+		points[0].uvw_.x /= points[0].xyz_.z;
+		points[1].uvw_.x /= points[1].xyz_.z;
+		points[2].uvw_.x /= points[2].xyz_.z;
+		points[3].uvw_.x /= points[3].xyz_.z;
 
-		uv_quad[0].z = 1.f / xyz_wall_quad[0].z;
-		uv_quad[1].z = 1.f / xyz_wall_quad[1].z;
+		points[0].uvw_.z = 1.f / points[0].xyz_.z;
+		points[1].uvw_.z = 1.f / points[1].xyz_.z;
 
-		int x1 = std::max(xyz_wall_quad[0].x * width_, normalized_bounds[0].x * width_);
+		int x1 = std::max(points[0].xyz_.x * width_, normalized_bounds[0].x * width_);
 		x1 = Math::Clamp(0, width_, x1);
-		int x2 = std::min(xyz_wall_quad[1].x * width_, (normalized_bounds[1].x) * width_);
+		int x2 = std::min(points[1].xyz_.x * width_, (normalized_bounds[1].x) * width_);
 		x2 = Math::Clamp(0, width_, x2);
 
-		float z_start_inv = 1 / xyz_wall_quad[0].z;
-		float z_end_inv = 1 / xyz_wall_quad[1].z;
+		float z_start_inv = 1 / points[0].xyz_.z;
+		float z_end_inv = 1 / points[1].xyz_.z;
 
 		// check if this is a portal
 		float portal_y_boundaries[4] = { 0, 0, 0, 0 };
@@ -349,41 +371,41 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 			float next_node_floor = next_node.floor_height_ - camera_->GetPosition().z;
 			float next_node_y[4] =
 			{
-				(half_height - next_node_ceiling * scale.y / xyz_wall_quad[0].z) / height_,
-				(half_height - next_node_ceiling * scale.y / xyz_wall_quad[1].z) / height_,
-				(half_height - next_node_floor * scale.y / xyz_wall_quad[2].z) / height_,
-				(half_height - next_node_floor * scale.y / xyz_wall_quad[3].z) / height_
+				(half_height - next_node_ceiling * scale.y / points[0].xyz_.z) / height_,
+				(half_height - next_node_ceiling * scale.y / points[1].xyz_.z) / height_,
+				(half_height - next_node_floor * scale.y / points[2].xyz_.z) / height_,
+				(half_height - next_node_floor * scale.y / points[3].xyz_.z) / height_
 			};
 					
-			portal_y_boundaries[0] = std::max(next_node_y[0], xyz_wall_quad[0].y);
-			portal_y_boundaries[1] = std::max(next_node_y[1], xyz_wall_quad[1].y);
-			portal_y_boundaries[2] = std::min(next_node_y[2], xyz_wall_quad[2].y);
-			portal_y_boundaries[3] = std::min(next_node_y[3], xyz_wall_quad[3].y);				
+			portal_y_boundaries[0] = std::max(next_node_y[0], points[0].xyz_.y);
+			portal_y_boundaries[1] = std::max(next_node_y[1], points[1].xyz_.y);
+			portal_y_boundaries[2] = std::min(next_node_y[2], points[2].xyz_.y);
+			portal_y_boundaries[3] = std::min(next_node_y[3], points[3].xyz_.y);
 			sf::Vector2f render_bounds[4] =
 			{
-				{ xyz_wall_quad[0].x, portal_y_boundaries[0] },
-				{ xyz_wall_quad[1].x, portal_y_boundaries[1] },
-				{ xyz_wall_quad[2].x, portal_y_boundaries[2] },
-				{ xyz_wall_quad[3].x, portal_y_boundaries[3] }
+				{ points[0].xyz_.x, portal_y_boundaries[0] },
+				{ points[1].xyz_.x, portal_y_boundaries[1] },
+				{ points[2].xyz_.x, portal_y_boundaries[2] },
+				{ points[3].xyz_.x, portal_y_boundaries[3] }
 			};
 
 			RenderMap(next_node, render_node, render_bounds, pixels, minimap);
 		}
 
-		float dx = xyz_wall_quad[1].x - xyz_wall_quad[0].x;
+		float dx = points[1].xyz_.x - points[0].xyz_.x;
 
-		Slope ya = Slope(xyz_wall_quad[1].y - xyz_wall_quad[0].y, dx);
-		Slope yb = Slope(xyz_wall_quad[2].y - xyz_wall_quad[3].y, dx);
-		Slope z_slope = Slope(xyz_wall_quad[1].z - xyz_wall_quad[0].z, dx);
+		Slope ya = Slope(points[1].xyz_.y - points[0].xyz_.y, dx);
+		Slope yb = Slope(points[2].xyz_.y - points[3].xyz_.y, dx);
+		Slope z_slope = Slope(points[1].xyz_.z - points[0].xyz_.z, dx);
 
 		Slope y_top = Slope(normalized_bounds[1].y - normalized_bounds[0].y, normalized_bounds[1].x - normalized_bounds[0].x);
 		Slope y_bottom = Slope(normalized_bounds[2].y - normalized_bounds[3].y, normalized_bounds[1].x - normalized_bounds[0].x);
 		
-		Slope w_slope = Slope(uv_quad[1].z - uv_quad[0].z, dx);
-		Slope u_slope = Slope(uv_quad[1].x - uv_quad[0].x, dx);
+		Slope w_slope = Slope(points[1].uvw_.z - points[0].uvw_.z, dx);
+		Slope u_slope = Slope(points[1].uvw_.x - points[0].uvw_.x, dx);
 
-		Slope x_map = Slope(wall->p2_.x - wall->p2_.x, x2 - x1);
-		Slope z_map = Slope(wall->p2_.y - wall->p1_.y, x2 - x1);
+		Slope x_map = Slope(points[1].original_position_.x - points[0].original_position_.x, x2 - x1);
+		Slope y_map = Slope(points[1].original_position_.y - points[0].original_position_.y, x2 - x1);
 
 		for (int x = x1; x < x2; x++) 
 		{
@@ -391,18 +413,18 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 			float nx = x / (float)width_;
 
 			// find y values
-			float dnx = nx - xyz_wall_quad[0].x;
-			int y1 = ya.Interpolate(xyz_wall_quad[0].y, dnx) * height_;
-			int y2 = yb.Interpolate(xyz_wall_quad[3].y, dnx) * height_;
+			float dnx = nx - points[0].xyz_.x;
+			int y1 = ya.Interpolate(points[0].xyz_.y, dnx) * height_;
+			int y2 = yb.Interpolate(points[3].xyz_.y, dnx) * height_;
 			int y_min = y_top.Interpolate(normalized_bounds[0].y, nx - normalized_bounds[0].x) * height_;
 			int y_max = y_bottom.Interpolate(normalized_bounds[3].y, nx - normalized_bounds[0].x) * height_;
 
 			// perspective correct u
-			float z = z_slope.Interpolate(xyz_wall_quad[0].z, dnx);
-			float w = w_slope.Interpolate(uv_quad[0].z, dnx);
-			float u = u_slope.Interpolate(uv_quad[0].x, dnx) / w;
+			float z = z_slope.Interpolate(points[0].xyz_.z, dnx);
+			float w = w_slope.Interpolate(points[0].uvw_.z, dnx);
+			float u = u_slope.Interpolate(points[0].uvw_.x, dnx) / w;
 
-			sf::FloatRect uv = sf::FloatRect(u, 0, uv_quad[0].y, uv_quad[3].y);
+			sf::FloatRect uv = sf::FloatRect(u, 0, points[0].uvw_.y, points[3].uvw_.y);
 			
 			// fix wall tex coords
 			Slope v = Slope(uv.height - uv.top, (float)(y2 - y1));
@@ -422,22 +444,22 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 			sf::IntRect wall_screen_space = { x, y1, 1, y2 - y1 };
 
 			// interpolate portal y boundaries
-			int portal_y_min = (portal_y_boundaries[0] + ((portal_y_boundaries[1] - portal_y_boundaries[0]) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (nx - xyz_wall_quad[0].x)) * height_;
-			int portal_y_max = (portal_y_boundaries[3] + ((portal_y_boundaries[2] - portal_y_boundaries[3]) / (xyz_wall_quad[1].x - xyz_wall_quad[0].x)) * (nx - xyz_wall_quad[0].x)) * height_;						
+			int portal_y_min = (portal_y_boundaries[0] + ((portal_y_boundaries[1] - portal_y_boundaries[0]) / (points[1].xyz_.x - points[0].xyz_.x)) * (nx - points[0].xyz_.x)) * height_;
+			int portal_y_max = (portal_y_boundaries[3] + ((portal_y_boundaries[2] - portal_y_boundaries[3]) / (points[1].xyz_.x - points[0].uvw_.x)) * (nx - points[0].xyz_.x)) * height_;
 			if (portal_y_min < y_min)
 				portal_y_min = y_min;
 
 			if (portal_y_max > y_max)
 				portal_y_max = y_max;
 
-			float x_origin = x_map.Interpolate(wall->p1_.x, x2 - x1);
-			float y_origin = z_map.Interpolate(wall->p1_.y, x2 - x1);
+			float x_origin = x_map.Interpolate(points[0].original_position_.x, x - x1);
+			float y_origin = y_map.Interpolate(points[0].original_position_.y, x - x1);
 
 			// render wall			
 			Point3D points[2] =
 			{ 
-				{ {(float)x, (float)y1, z}, {uv.left, uv.top, 1 } },
-				{ {(float)x, (float)y2 + 2, z}, {uv.width, uv.height, 1} }
+				{ {(float)x, (float)y1, z}, {uv.left, uv.top, 1 }, { x_origin, y_origin, ceiling } },
+				{ {(float)x, (float)y2 + 2, z}, {uv.width, uv.height, 1}, { x_origin, y_origin, floor } }
 			};
 
 			RasterizeVerticalSlice(
@@ -455,9 +477,17 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 {
 	// render the floor/ceiling. this uses actual 3d projection!
 	// floor
-	Point3D plane_polygon[100];
-	for (int i = 0; i < render_node.plane_xy_.size(); i++)
-		plane_polygon[i] = { { render_node.plane_xy_[i].x, render_node.plane_xy_[i].y, 0 }, { render_node.plane_uv_[i].x, render_node.plane_uv_[i].y, 0 } };
+	vector<Point3D> plane_polygon;
+	plane_polygon.resize(render_node.plane_xy_.size() * 2);
+	for (int i = 0; i < render_node.plane_xy_.size(); i++) 
+	{
+		plane_polygon[i] =  
+			{ 
+				{ render_node.plane_xy_[i].x, render_node.plane_xy_[i].y, 0 },
+				{ render_node.plane_uv_[i].x, render_node.plane_uv_[i].y, 0 },
+				{ render_node.plane_xy_[i].x, 0, render_node.plane_xy_[i].y },
+			};
+	}
 
 	// translate and rotate
 	for (int i = 0; i < render_node.plane_xy_.size(); i++)
@@ -470,7 +500,7 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 	}
 
 	// clip
-	int vertices = ClipPolygon(plane_polygon, render_node.plane_xy_.size());
+	int vertices = ClipPolygon(&plane_polygon[0], render_node.plane_xy_.size());
 	if (vertices == 0)
 		return;
 
@@ -495,13 +525,14 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 	float half_height = 0.5f * height_;
 	float half_width = 0.5f * width_;
 
-	float ceiling_y[100];
+	vector<float> ceiling_y;
 	for (int i = 0; i < vertices; i++)
 	{
 		// xyz
 		plane_polygon[i].xyz_.y = (half_height - floor * scale.y / plane_polygon[i].xyz_.z) / height_;
-		ceiling_y[i] = (half_height - ceiling * scale.y / plane_polygon[i].xyz_.z) / height_;
+		ceiling_y.push_back((half_height - ceiling * scale.y / plane_polygon[i].xyz_.z) / height_);
 		plane_polygon[i].xyz_.x = (half_width - plane_polygon[i].xyz_.x * scale.x / plane_polygon[i].xyz_.z) / width_;
+		plane_polygon[i].original_position_.y = floor;
 
 		// uvw
 		plane_polygon[i].uvw_.x /= plane_polygon[i].xyz_.z;
@@ -514,8 +545,11 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 		RasterizePolygon(pixels, &plane_polygon[0], vertices, *render_node.floor_texture_);
 
 	// render ceiling
-	for (int i = 0; i < vertices; i++)
+	for (int i = 0; i < vertices; i++) 
+	{
 		plane_polygon[i].xyz_.y = ceiling_y[i];
+		plane_polygon[i].original_position_.y = ceiling;
+	}
 
 	if (vertices > 0)
 		RasterizePolygon(pixels, &plane_polygon[0], vertices, *render_node.ceiling_texture_);
@@ -564,6 +598,8 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 		Slope bv = Slope(points[2].uvw_.y - points[0].uvw_.y, (float)std::abs(y3 - y1));
 		Slope bw = Slope(points[2].uvw_.z - points[0].uvw_.z, (float)std::abs(y3 - y1));
 		
+		Slope map_z = Slope(points[1].original_position_.z - points[0].original_position_.z, (float)std::abs(y2 - y1));
+
 		if (y2 - y1)
 		{
 			for (int y = Math::Clamp(0, height_, y1); (y < y2) && (y < height_); y++)
@@ -571,7 +607,6 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 				int x1 = ax.Interpolate(points[0].xyz_.x, y - y1) * width_;
 				int x2 = bx.Interpolate(points[0].xyz_.x, y - y1) * width_;
 				
-
 				float u1 = au.Interpolate(points[0].uvw_.x, y - y1);
 				float v1 = av.Interpolate(points[0].uvw_.y, y - y1);
 				float w1 = aw.Interpolate(points[0].uvw_.z, y - y1);
@@ -595,6 +630,8 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 				float tstep = 1.0f / ((float)(x2 - x1));
 				float t = 0.0f;
 
+				Slope map_x = Slope(points[1].xyz_.x - points[0].original_position_.x, x2 - x1);
+				float z_real = map_z.Interpolate(points[0].original_position_.z, y - y1);
 				for (int x = Math::Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
 				{					
 					tex_u = (1.0f - t) * u1 + t * u2;
@@ -608,7 +645,10 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 					DrawPixel(
 						pixels, x, y,
 						tex_u / tex_w, tex_v / tex_w, texture,
-						1.f / tex_w, { 0, 0, 0 });
+						1.f / tex_w,
+						map_x.Interpolate(points[0].original_position_.x, x - x1),
+						points[0].original_position_.y,
+						z_real);
 
 					t += tstep;
 				}
@@ -623,6 +663,8 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 			aw = Slope(points[2].uvw_.z - points[1].uvw_.z, (float)std::abs(y3 - y2));
 
 			bx = Slope(points[2].xyz_.x - points[0].xyz_.x, (float)std::abs(y3 - y1));
+
+			map_z = Slope(points[2].original_position_.z - points[1].original_position_.z, (float)std::abs(y3 - y2));
 			for (int y = Math::Clamp(0, height_, y2); (y < y3) && (y < height_); y++)
 			{
 				int x1 = ax.Interpolate(points[1].xyz_.x, y - y2) * width_;
@@ -651,6 +693,8 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 				float tstep = 1.0f / ((float)(x2 - x1));
 				float t = 0.0f;
 
+				Slope map_x = Slope(points[2].original_position_.x - points[1].original_position_.x, x2 - x1);
+				float z_real = map_z.Interpolate(points[0].xyz_.z, y - y1);
 				for (int x = Math::Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
 				{
 					tex_u = (1.0f - t) * u1 + t * u2;
@@ -664,7 +708,10 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 					DrawPixel(
 						pixels, x, y,
 						tex_u / tex_w, tex_v / tex_w, texture,
-						1.f / tex_w, { 0, 0, 0 });
+						1.f / tex_w,	
+						map_x.Interpolate(points[0].original_position_.x, x - x1),
+						points[0].original_position_.y,
+						z_real);
 
 					t += tstep;
 				}
@@ -699,13 +746,13 @@ void NovaEngine::RasterizeVerticalSlice(
 			depth_buffer[x + y * width_] = points[0].xyz_.z;
 
 		float v = v_slope.Interpolate(points[0].uvw_.y, y - points[0].xyz_.y);
-		//sf::Color colour = texture.GetPixel(u, v);
-		//pixels->SetPixel(x, y, colour);
-		//DrawPixel(pixels, x, y , { x / (float)width_, y / (float)height_, points[0].xyz_.z }, colour);
 		DrawPixel(
 			pixels, x, y,
 			u, v, texture,
-			points[0].xyz_.z, { points[0].original_position_.x, points[0].original_position_.y, z_map.Interpolate(points[0].original_position_.z, y - points[0].xyz_.y) });
+			points[0].xyz_.z,
+			points[0].original_position_.x,
+			points[0].original_position_.y,
+			z_map.Interpolate(points[0].original_position_.z, y - points[0].xyz_.y));
 	}
 }
 
@@ -777,73 +824,75 @@ int NovaEngine::ClipPolygon(class Point3D points[], int num_points)
 
 inline void NovaEngine::DrawPixel(
 	class Texture* pixels, int x, int y,
-	float u, float v, const Texture& texture,
-	float z, sf::Vector3f map_coordinate)
+	float u, float v, const class Texture& texture,
+	float z, float map_x, float map_y, float map_z)
 {	
-	if (z >= fog_occlusion_distance_) 
-	{
-		pixels->SetPixel(x, y, fog_colour_);
-		return;
-	}
-
 	// quick lerp
 	auto mix = [](float f, auto a, auto b)
 	{
 		return a + (b - a) * f;
 	};
 
+	/*auto fastPow = [](double a, double b) {
+		union {
+			double d;
+			int x[2];
+		} u = { a };
+		u.x[1] = (int)(b * (u.x[1] - 1072632447) + 1072632447);
+		u.x[0] = 0;
+		return u.d;
+	};*/
+
 	// get texture pixel and bi-linear filter
 	u = Math::Clamp(0, texture.GetWidth(), fmodf(u * texture.GetWidth(), texture.GetWidth()));
 	v = Math::Clamp(0, texture.GetHeight(), fmodf(v * texture.GetHeight(), texture.GetHeight()));
 
 	sf::Color colour = texture.GetPixel(u, v);
-	/*sf::Color bilinear_filter[4] = 
-	{
-		texture.GetPixel(u, (int)(v - 1.f) % texture.GetHeight()),
-		texture.GetPixel(u, (int)(v + 1.f) % texture.GetHeight()),
-		texture.GetPixel((int)(u - 1.f) % texture.GetWidth(), v),
-		texture.GetPixel((int)(u + 1.f) % texture.GetWidth(), v)
-	};
 
-	for (auto& filter_colour : bilinear_filter) 
+	float dx = camera_->GetPosition().x - map_x;
+	float dy = camera_->GetPosition().y - map_y;
+	float dz = camera_->GetPosition().z - map_z;
+	z = std::sqrtf(dx * dx + dy * dy + dz * dz);
+	
+	// calculate lights
+	float r = 0;
+	float g = 0;
+	float b = 0;
+	for (auto *light : lights_)
 	{
-		colour.r = mix(0.5f, colour.r, filter_colour.r);
-		colour.g = mix(0.5f, colour.g, filter_colour.g);
-		colour.b = mix(0.5f, colour.b, filter_colour.b);
+		float dist = light->GetDistance(map_x, map_y, map_z);
+		float light_magnitude = std::powf(dist, -2) * 1000;
+
+		r += light->colour_.r / 255.f * light_magnitude;
+		g += light->colour_.g / 255.f * light_magnitude;
+		b += light->colour_.b / 255.f * light_magnitude;
 	}
-	*/
+
+	if (r > 1)
+		r = 1;
+	if (g > 1)
+		g = 1;
+	if (b > 1)
+		b = 1;
+
+	colour.r = mix(r, colour.r, 255);
+	colour.g = mix(g, colour.g, 255);
+	colour.b = mix(b, colour.b, 255);
+
 	// mix fog
 	float mag = std::powf(z, fog_density_) / 255.f;
-	colour.r = mix(mag, colour.r, fog_colour_.r);
-	colour.g = mix(mag, colour.g, fog_colour_.g);
-	colour.b = mix(mag, colour.b, fog_colour_.b);
-
-	// calculate lights
-	/*for (auto &light : lights_)
+	if (mag >= 1)
 	{
-		//Light light(sf::Color::White, camera_->GetPosition());
-		//light.position_.z += 10;
-
-		float dist = light->GetDistance(world_coordinate);
-		float light_magnitude = std::powf(dist, -1.5);
-		colour.r += light->colour_.r * light_magnitude * 5.f;
-		colour.g += light->colour_.g * light_magnitude * 5.f;
-		colour.b += light->colour_.b * light_magnitude * 5.f;
-	}*/
-
-	/*if (r * 0.229f > 255)
-		r = 255;
-	if (b * 0.587f > 255)
-		b = 255;
-	if (g * 0.114f > 255)
-		g = 255;*/
-
-
-	//public static decimal GetColourBrightnessPerceived(Color colour)
-	/*{
-		return ((0.299m * colour.R) + (0.587m * colour.G) + (0.114m * colour.B)) / 255.0m;
+		// mix light a little more here?
+		colour = fog_colour_;
 	}
-	*/
+	else
+	{
+		colour.r = mix(mag, colour.r, fog_colour_.r);
+		colour.g = mix(mag, colour.g, fog_colour_.g);
+		colour.b = mix(mag, colour.b, fog_colour_.b);
+	}
+
 	pixels->SetPixel(x, y, colour);
 }
 
