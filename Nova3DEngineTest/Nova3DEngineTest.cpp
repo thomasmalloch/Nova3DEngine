@@ -275,7 +275,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 #if _DEBUG
 	test->Setup(1280, 720, 3, false);
 #else
-	test->Setup(1280, 720, 3, false);
+	test->Setup(1280, 720, 2, false);
 #endif
 
 	test->Run();

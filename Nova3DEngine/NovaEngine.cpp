@@ -485,7 +485,7 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 			{ 
 				{ render_node.plane_xy_[i].x, render_node.plane_xy_[i].y, 0 },
 				{ render_node.plane_uv_[i].x, render_node.plane_uv_[i].y, 0 },
-				{ render_node.plane_xy_[i].x, 0, render_node.plane_xy_[i].y },
+				{ render_node.plane_xy_[i].x, render_node.plane_xy_[i].y, 0 },
 			};
 	}
 
@@ -532,7 +532,7 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 		plane_polygon[i].xyz_.y = (half_height - floor * scale.y / plane_polygon[i].xyz_.z) / height_;
 		ceiling_y.push_back((half_height - ceiling * scale.y / plane_polygon[i].xyz_.z) / height_);
 		plane_polygon[i].xyz_.x = (half_width - plane_polygon[i].xyz_.x * scale.x / plane_polygon[i].xyz_.z) / width_;
-		plane_polygon[i].original_position_.y = floor;
+		plane_polygon[i].original_position_.z = floor;
 
 		// uvw
 		plane_polygon[i].uvw_.x /= plane_polygon[i].xyz_.z;
@@ -548,7 +548,7 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 	for (int i = 0; i < vertices; i++) 
 	{
 		plane_polygon[i].xyz_.y = ceiling_y[i];
-		plane_polygon[i].original_position_.y = ceiling;
+		plane_polygon[i].original_position_.z = ceiling;
 	}
 
 	if (vertices > 0)
@@ -598,7 +598,7 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 		Slope bv = Slope(points[2].uvw_.y - points[0].uvw_.y, (float)std::abs(y3 - y1));
 		Slope bw = Slope(points[2].uvw_.z - points[0].uvw_.z, (float)std::abs(y3 - y1));
 		
-		Slope map_z = Slope(points[1].original_position_.z - points[0].original_position_.z, (float)std::abs(y2 - y1));
+		Slope map_y = Slope(points[1].original_position_.y - points[0].original_position_.y, (float)std::abs(y2 - y1));
 
 		if (y2 - y1)
 		{
@@ -631,7 +631,7 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 				float t = 0.0f;
 
 				Slope map_x = Slope(points[1].xyz_.x - points[0].original_position_.x, x2 - x1);
-				float z_real = map_z.Interpolate(points[0].original_position_.z, y - y1);
+				float y_real = map_y.Interpolate(points[0].original_position_.y, y - y1);
 				for (int x = Math::Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
 				{					
 					tex_u = (1.0f - t) * u1 + t * u2;
@@ -647,8 +647,8 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 						tex_u / tex_w, tex_v / tex_w, texture,
 						1.f / tex_w,
 						map_x.Interpolate(points[0].original_position_.x, x - x1),
-						points[0].original_position_.y,
-						z_real);
+						y_real,
+						points[0].original_position_.y);
 
 					t += tstep;
 				}
@@ -664,7 +664,7 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 
 			bx = Slope(points[2].xyz_.x - points[0].xyz_.x, (float)std::abs(y3 - y1));
 
-			map_z = Slope(points[2].original_position_.z - points[1].original_position_.z, (float)std::abs(y3 - y2));
+			map_y = Slope(points[2].original_position_.y - points[1].original_position_.y, (float)std::abs(y3 - y2));
 			for (int y = Math::Clamp(0, height_, y2); (y < y3) && (y < height_); y++)
 			{
 				int x1 = ax.Interpolate(points[1].xyz_.x, y - y2) * width_;
@@ -694,7 +694,7 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 				float t = 0.0f;
 
 				Slope map_x = Slope(points[2].original_position_.x - points[1].original_position_.x, x2 - x1);
-				float z_real = map_z.Interpolate(points[0].xyz_.z, y - y1);
+				float y_real = map_y.Interpolate(points[0].original_position_.y, y - y1);
 				for (int x = Math::Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
 				{
 					tex_u = (1.0f - t) * u1 + t * u2;
@@ -710,8 +710,8 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 						tex_u / tex_w, tex_v / tex_w, texture,
 						1.f / tex_w,	
 						map_x.Interpolate(points[0].original_position_.x, x - x1),
-						points[0].original_position_.y,
-						z_real);
+						y_real,
+						points[0].original_position_.z);
 
 					t += tstep;
 				}
@@ -758,7 +758,8 @@ void NovaEngine::RasterizeVerticalSlice(
 
 int NovaEngine::ClipPolygon(class Point3D points[], int num_points)
 {
-	Point3D* new_points = new Point3D[num_points * 2];
+	std::vector<Point3D> new_points;
+	new_points.resize(num_points * 2);
 	int poly_count = num_points;
 	int clipped_count = 0;
 
@@ -784,10 +785,14 @@ int NovaEngine::ClipPolygon(class Point3D points[], int num_points)
 
 				Slope u = Slope(next.uvw_.x - current.uvw_.x, next.xyz_.x - current.xyz_.x);
 				Slope v = Slope(next.uvw_.y - current.uvw_.y, next.xyz_.z - current.xyz_.z);
+				Slope x = Slope(next.original_position_.x - current.original_position_.x, next.xyz_.x - current.xyz_.x);
+				Slope y = Slope(next.original_position_.y - current.original_position_.y, next.xyz_.z - current.xyz_.z);
 
 				Point3D intersecting_point;
 				intersecting_point.uvw_.x = u.Interpolate(current.uvw_.x, intersect.x - current.xyz_.x);
 				intersecting_point.uvw_.y = v.Interpolate(current.uvw_.y, intersect.z - current.xyz_.z);
+				intersecting_point.original_position_.x = x.Interpolate(current.original_position_.x, intersect.x - current.xyz_.x);
+				intersecting_point.original_position_.y = y.Interpolate(current.original_position_.y, intersect.z - current.xyz_.z);
 				intersecting_point.xyz_.x = intersect.x;
 				intersecting_point.xyz_.z = intersect.z;
 				intersecting_point.xyz_.y = current.xyz_.y;
@@ -801,10 +806,14 @@ int NovaEngine::ClipPolygon(class Point3D points[], int num_points)
 
 				Slope u = Slope(next.uvw_.x - current.uvw_.x, next.xyz_.x - current.xyz_.x);
 				Slope v = Slope(next.uvw_.y - current.uvw_.y, next.xyz_.z - current.xyz_.z);
+				Slope x = Slope(next.original_position_.x - current.original_position_.x, next.xyz_.x - current.xyz_.x);
+				Slope y = Slope(next.original_position_.y - current.original_position_.y, next.xyz_.z - current.xyz_.z);
 
 				Point3D intersecting_point;
 				intersecting_point.uvw_.x = u.Interpolate(current.uvw_.x, intersect.x - current.xyz_.x);
 				intersecting_point.uvw_.y = v.Interpolate(current.uvw_.y, intersect.z - current.xyz_.z);
+				intersecting_point.original_position_.x = x.Interpolate(current.original_position_.x, intersect.x - current.xyz_.x);
+				intersecting_point.original_position_.y = y.Interpolate(current.original_position_.y, intersect.z - current.xyz_.z);
 				intersecting_point.xyz_.x = intersect.x;
 				intersecting_point.xyz_.z = intersect.z;
 				intersecting_point.xyz_.y = current.xyz_.y;
@@ -818,7 +827,7 @@ int NovaEngine::ClipPolygon(class Point3D points[], int num_points)
 			points[i] = new_points[i];
 	}
 
-	delete[] new_points;
+	//delete[] new_points;
 	return clipped_count;
 }
 
@@ -832,16 +841,6 @@ inline void NovaEngine::DrawPixel(
 	{
 		return a + (b - a) * f;
 	};
-
-	/*auto fastPow = [](double a, double b) {
-		union {
-			double d;
-			int x[2];
-		} u = { a };
-		u.x[1] = (int)(b * (u.x[1] - 1072632447) + 1072632447);
-		u.x[0] = 0;
-		return u.d;
-	};*/
 
 	// get texture pixel and bi-linear filter
 	u = Math::Clamp(0, texture.GetWidth(), fmodf(u * texture.GetWidth(), texture.GetWidth()));
@@ -880,7 +879,7 @@ inline void NovaEngine::DrawPixel(
 	colour.b = mix(b, colour.b, 255);
 
 	// mix fog
-	float mag = std::powf(z, fog_density_) / 255.f;
+	/*float mag = std::powf(z, fog_density_) / 255.f;
 	if (mag >= 1)
 	{
 		// mix light a little more here?
@@ -891,7 +890,7 @@ inline void NovaEngine::DrawPixel(
 		colour.r = mix(mag, colour.r, fog_colour_.r);
 		colour.g = mix(mag, colour.g, fog_colour_.g);
 		colour.b = mix(mag, colour.b, fog_colour_.b);
-	}
+	}*/
 
 	pixels->SetPixel(x, y, colour);
 }
