@@ -91,9 +91,6 @@ void NovaEngine::Run()
 	clear.setSize({ (float)width_, (float)height_ });
 
 	unsigned int framerate = 0;
-	/*for (auto light : lights_)
-		translated_lights_.push_back(new Light(light->colour_, light->position_));*/
-
 	while (render_window_->isOpen()) 
 	{
 		// process input
@@ -145,17 +142,6 @@ void NovaEngine::Run()
 			for (int y = 0; y < height_; y++)
 				pixels->SetPixel(x, y, fog_colour_);
 		}
-		
-		// translate lights
-		/*for (int i = 0; i < lights_.size(); i++) 
-		{
-			translated_lights_[i]->position_.x = lights_[i]->position_.x - camera_->GetPosition().x;
-			translated_lights_[i]->position_.y = lights_[i]->position_.y - camera_->GetPosition().y;
-			translated_lights_[i]->position_.z = lights_[i]->position_.z - camera_->GetPosition().z;
-
-			translated_lights_[i]->position_.z = translated_lights_[i]->position_.x * camera_->GetCosAngle() + translated_lights_[i]->position_.y * camera_->GetSinAngle();
-			translated_lights_[i]->position_.x = translated_lights_[i]->position_.x * camera_->GetSinAngle() - plane_polygon[i].xyz_.y * camera_->GetCosAngle();
-		}*/
 
 		// render floors and ceiling
 		for (auto* node : current_map_->nodes_)		
@@ -346,10 +332,12 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 		points[3].xyz_.x = (half_width - points[3].xyz_.x * scale.x / points[3].xyz_.z) / width_;
 
 		// wall uv perspective correction
-		points[0].uvw_.x /= points[0].xyz_.z;
-		points[1].uvw_.x /= points[1].xyz_.z;
-		points[2].uvw_.x /= points[2].xyz_.z;
-		points[3].uvw_.x /= points[3].xyz_.z;
+		for (int i = 0; i < 4; i++) 
+		{
+			points[i].uvw_.x /= points[i].xyz_.z;
+			points[i].original_position_.x /= points[i].xyz_.z;
+			points[i].original_position_.y /= points[i].xyz_.z;
+		}
 
 		points[0].uvw_.z = 1.f / points[0].xyz_.z;
 		points[1].uvw_.z = 1.f / points[1].xyz_.z;
@@ -452,8 +440,8 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 			if (portal_y_max > y_max)
 				portal_y_max = y_max;
 
-			float x_origin = x_map.Interpolate(points[0].original_position_.x, x - x1);
-			float y_origin = y_map.Interpolate(points[0].original_position_.y, x - x1);
+			float x_origin = x_map.Interpolate(points[0].original_position_.x, x - x1) / w;
+			float y_origin = y_map.Interpolate(points[0].original_position_.y, x - x1) / w;
 
 			// render wall			
 			Point3D points[2] =
@@ -538,6 +526,10 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 		plane_polygon[i].uvw_.x /= plane_polygon[i].xyz_.z;
 		plane_polygon[i].uvw_.y /= plane_polygon[i].xyz_.z;
 		plane_polygon[i].uvw_.z = 1.f / plane_polygon[i].xyz_.z;
+
+		// original
+		plane_polygon[i].original_position_.x /= plane_polygon[i].xyz_.z;
+		plane_polygon[i].original_position_.y /= plane_polygon[i].xyz_.z;
 	}
 
 	// render floor
@@ -589,19 +581,23 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 		int y3 = points[2].xyz_.y * height_;
 		
 		Slope ax = Slope(points[1].xyz_.x - points[0].xyz_.x, (float)std::abs(y2 - y1));
+		Slope ax_map = Slope(points[1].original_position_.x - points[0].original_position_.x, (float)std::abs(y2 - y1));
+		Slope ay_map = Slope(points[1].original_position_.y - points[0].original_position_.y, (float)std::abs(y2 - y1));
 		Slope au = Slope(points[1].uvw_.x - points[0].uvw_.x, (float)std::abs(y2 - y1));
 		Slope av = Slope(points[1].uvw_.y - points[0].uvw_.y, (float)std::abs(y2 - y1));
 		Slope aw = Slope(points[1].uvw_.z - points[0].uvw_.z, (float)std::abs(y2 - y1));
 
 		Slope bx = Slope(points[2].xyz_.x - points[0].xyz_.x, (float)std::abs(y3 - y1));
+		Slope bx_map = Slope(points[2].original_position_.x - points[0].original_position_.x, (float)std::abs(y3 - y1));
+		Slope by_map = Slope(points[2].original_position_.y - points[0].original_position_.y, (float)std::abs(y3 - y1));
 		Slope bu = Slope(points[2].uvw_.x - points[0].uvw_.x, (float)std::abs(y3 - y1));
 		Slope bv = Slope(points[2].uvw_.y - points[0].uvw_.y, (float)std::abs(y3 - y1));
 		Slope bw = Slope(points[2].uvw_.z - points[0].uvw_.z, (float)std::abs(y3 - y1));
-		
-		Slope map_y = Slope(points[1].original_position_.y - points[0].original_position_.y, (float)std::abs(y2 - y1));
+
 
 		if (y2 - y1)
 		{
+			Slope y_map = Slope(points[1].original_position_.x - points[0].original_position_.x, y2 - y1);
 			for (int y = Math::Clamp(0, height_, y1); (y < y2) && (y < height_); y++)
 			{
 				int x1 = ax.Interpolate(points[0].xyz_.x, y - y1) * width_;
@@ -610,10 +606,14 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 				float u1 = au.Interpolate(points[0].uvw_.x, y - y1);
 				float v1 = av.Interpolate(points[0].uvw_.y, y - y1);
 				float w1 = aw.Interpolate(points[0].uvw_.z, y - y1);
+				float x1_map = ax_map.Interpolate(points[0].original_position_.x, y - y1);
+				float y1_map = ay_map.Interpolate(points[0].original_position_.y, y - y1);
 
 				float u2 = bu.Interpolate(points[0].uvw_.x, y - y1);
 				float v2 = bv.Interpolate(points[0].uvw_.y, y - y1);
 				float w2 = bw.Interpolate(points[0].uvw_.z, y - y1);
+				float x2_map = bx_map.Interpolate(points[0].original_position_.x, y - y1);
+				float y2_map = by_map.Interpolate(points[0].original_position_.y, y - y1);
 
 				if (x1 > x2)
 				{
@@ -621,34 +621,39 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 					std::swap(u1, u2);
 					std::swap(v1, v2);
 					std::swap(w1, w2);
+					std::swap(x1_map, x2_map);
+					std::swap(y1_map, y2_map);
 				}
 
 				float tex_u = u1;
 				float tex_v = v1;
 				float tex_w = w1;
+				float x_map = x1_map;
+				float y_map = y1_map;
 
 				float tstep = 1.0f / ((float)(x2 - x1));
 				float t = 0.0f;
-
-				Slope map_x = Slope(points[1].xyz_.x - points[0].original_position_.x, x2 - x1);
-				float y_real = map_y.Interpolate(points[0].original_position_.y, y - y1);
+				
 				for (int x = Math::Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
 				{					
 					tex_u = (1.0f - t) * u1 + t * u2;
 					tex_v = (1.0f - t) * v1 + t * v2;
 					tex_w = (1.0f - t) * w1 + t * w2;
+					x_map = (1.0f - t) * x1_map + t * x2_map;
+					y_map = (1.0f - t) * y1_map + t * y2_map;
 
-					if (depth_buffer[x + y * width_] > tex_w)
+					float z = 1.f / tex_w;
+					if (depth_buffer[x + y * width_] > z)
 						continue;
 
-					depth_buffer[x + y * width_] = tex_w;
+					depth_buffer[x + y * width_] = z;
 					DrawPixel(
 						pixels, x, y,
 						tex_u / tex_w, tex_v / tex_w, texture,
-						1.f / tex_w,
-						map_x.Interpolate(points[0].original_position_.x, x - x1),
-						y_real,
-						points[0].original_position_.y);
+						z,
+						x_map / tex_w,
+						y_map / tex_w,
+						points[0].original_position_.z);
 
 					t += tstep;
 				}
@@ -658,13 +663,13 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 		if (y3 - y2)
 		{
 			ax = Slope(points[2].xyz_.x - points[1].xyz_.x, (float)std::abs(y3 - y2));
+			ax_map = Slope(points[2].original_position_.x - points[1].original_position_.x, (float)std::abs(y3 - y2));
+			ay_map = Slope(points[2].original_position_.y - points[1].original_position_.y, (float)std::abs(y3 - y2));
 			au = Slope(points[2].uvw_.x - points[1].uvw_.x, (float)std::abs(y3 - y2));
 			av = Slope(points[2].uvw_.y - points[1].uvw_.y, (float)std::abs(y3 - y2));
 			aw = Slope(points[2].uvw_.z - points[1].uvw_.z, (float)std::abs(y3 - y2));
 
 			bx = Slope(points[2].xyz_.x - points[0].xyz_.x, (float)std::abs(y3 - y1));
-
-			map_y = Slope(points[2].original_position_.y - points[1].original_position_.y, (float)std::abs(y3 - y2));
 			for (int y = Math::Clamp(0, height_, y2); (y < y3) && (y < height_); y++)
 			{
 				int x1 = ax.Interpolate(points[1].xyz_.x, y - y2) * width_;
@@ -673,10 +678,14 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 				float u1 = au.Interpolate(points[1].uvw_.x, y - y2);
 				float v1 = av.Interpolate(points[1].uvw_.y, y - y2);
 				float w1 = aw.Interpolate(points[1].uvw_.z, y - y2);
+				float x1_map = ax_map.Interpolate(points[1].original_position_.x, y - y2);
+				float y1_map = ay_map.Interpolate(points[1].original_position_.y, y - y2);
 
 				float u2 = bu.Interpolate(points[0].uvw_.x, y - y1);
 				float v2 = bv.Interpolate(points[0].uvw_.y, y - y1);
 				float w2 = bw.Interpolate(points[0].uvw_.z, y - y1);
+				float x2_map = bx_map.Interpolate(points[0].original_position_.x, y - y1);
+				float y2_map = by_map.Interpolate(points[0].original_position_.y, y - y1);
 
 				if (x1 > x2)
 				{
@@ -684,33 +693,38 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 					std::swap(u1, u2);
 					std::swap(v1, v2);
 					std::swap(w1, w2);
+					std::swap(x1_map, x2_map);
+					std::swap(y1_map, y2_map);
 				}
 
 				float tex_u = u1;
 				float tex_v = v1;
 				float tex_w = w1;
+				float x_map = x1_map;
+				float y_map = y1_map;
 
 				float tstep = 1.0f / ((float)(x2 - x1));
 				float t = 0.0f;
-
-				Slope map_x = Slope(points[2].original_position_.x - points[1].original_position_.x, x2 - x1);
-				float y_real = map_y.Interpolate(points[0].original_position_.y, y - y1);
 				for (int x = Math::Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
 				{
 					tex_u = (1.0f - t) * u1 + t * u2;
 					tex_v = (1.0f - t) * v1 + t * v2;
-					tex_w = (1.0f - t) * w1 + t * w2;
+					tex_w = (1.0f - t) * w1 + t * w2; 
+					x_map = (1.0f - t) * x1_map + t * x2_map;
+					y_map = (1.0f - t) * y1_map + t * y2_map;
 
-					if (depth_buffer[x + y * width_] > tex_w)
+					float z = 1.f / tex_w;
+					if (depth_buffer[x + y * width_] > z)
 						continue;
 
-					depth_buffer[x + y * width_] = tex_w;
+					depth_buffer[x + y * width_] = z;
+					
 					DrawPixel(
 						pixels, x, y,
 						tex_u / tex_w, tex_v / tex_w, texture,
-						1.f / tex_w,	
-						map_x.Interpolate(points[0].original_position_.x, x - x1),
-						y_real,
+						z,	
+						x_map / tex_w,
+						y_map / tex_w,
 						points[0].original_position_.z);
 
 					t += tstep;
@@ -879,7 +893,11 @@ inline void NovaEngine::DrawPixel(
 	colour.b = mix(b, colour.b, 255);
 
 	// mix fog
-	/*float mag = std::powf(z, fog_density_) / 255.f;
+	float light_lum = (0.2126f * r + 0.7152f * g + 0.0722f * b);
+	float mag = std::powf(z, fog_density_) / 255.f - light_lum;
+	if (mag < 0)
+		mag = 0;
+
 	if (mag >= 1)
 	{
 		// mix light a little more here?
@@ -890,7 +908,7 @@ inline void NovaEngine::DrawPixel(
 		colour.r = mix(mag, colour.r, fog_colour_.r);
 		colour.g = mix(mag, colour.g, fog_colour_.g);
 		colour.b = mix(mag, colour.b, fog_colour_.b);
-	}*/
+	}
 
 	pixels->SetPixel(x, y, colour);
 }
