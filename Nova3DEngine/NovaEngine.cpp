@@ -643,10 +643,10 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 					y_map = (1.0f - t) * y1_map + t * y2_map;
 
 					float z = 1.f / tex_w;
-					if (depth_buffer[x + y * width_] > z)
+					if (depth_buffer[x + y * width_] > tex_w)
 						continue;
 
-					depth_buffer[x + y * width_] = z;
+					depth_buffer[x + y * width_] = tex_w;
 					DrawPixel(
 						pixels, x, y,
 						tex_u / tex_w, tex_v / tex_w, texture,
@@ -714,10 +714,10 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const class Point3D ver
 					y_map = (1.0f - t) * y1_map + t * y2_map;
 
 					float z = 1.f / tex_w;
-					if (depth_buffer[x + y * width_] > z)
+					if (depth_buffer[x + y * width_] > tex_w)
 						continue;
 
-					depth_buffer[x + y * width_] = z;
+					depth_buffer[x + y * width_] = tex_w;
 					
 					DrawPixel(
 						pixels, x, y,
