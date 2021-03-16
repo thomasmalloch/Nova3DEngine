@@ -62,7 +62,7 @@ public:
 		std::string zoop(wide.begin(), wide.end());
 
 		if (zoop.length() == 0)
-			zoop = "level2.map";
+			zoop = "lighttest.map";
 
 		map_ = new Map(zoop);
 		if (map_->nodes_.size() > 1) 
@@ -270,7 +270,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 {
 
 	
-	EngineTest test = EngineTest(lpCmdLine);
+	auto test = EngineTest(lpCmdLine);
 
 #if _DEBUG
 	test.Setup(1280, 720, 3, false);

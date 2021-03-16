@@ -60,12 +60,12 @@ namespace nova
 		static constexpr float eighth_pi_ = 3.141592654f / 8.0f;
 		static constexpr float half_pi_ = 3.141592654f / 2.0f;
 
-		static inline float Interpolate() 		
+		static float Interpolate() 		
 		{
 			return 0; //x_start + ((end - start) / ())
 		}
 
-		static inline float Clamp(float min, float max, float num) 
+		static float Clamp(const float min, const float max, const float num)
 		{
 			if (num < min)
 				return min;
@@ -75,56 +75,56 @@ namespace nova
 			return num;
 		}
 
-		static inline float CrossProduct(float x1, float y1, float x2, float y2)
+		static float CrossProduct(const float x1, const float y1, const float x2, const float y2)
 		{
 			return x1 * y2 - y1 * x2;
 		}
 
-		static inline float DotProduct(float x1, float y1, float x2, float y2)
+		static float DotProduct(const float x1, const float y1, const float x2, const float y2)
 		{
 			return x1 * x2 + y1 * y2;
 		}
 
-		static inline float DotProduct(float x1, float y1, float z1, float x2, float y2, float z2)
+		static float DotProduct(const float x1, const float y1, const float z1, const float x2, const float y2, const float z2)
 		{
 			return x1 * x2 + y1 * y2 + z1 * z2;
 		}
 
-		static inline float DotProduct(sf::Vector3f a, sf::Vector3f b)
+		static float DotProduct(const sf::Vector3f a, const sf::Vector3f b)
 		{
 			return a.x * b.x + a.y * b.y + a.z * b.z;
 		}
 
-		static inline float DotProduct(sf::Vector2f a, sf::Vector2f b)
+		static float DotProduct(const sf::Vector2f a, const sf::Vector2f b)
 		{
 			return a.x * b.x + a.y * b.y;
 		}
 
-		static inline const sf::Vector2f& const Intersect (float x1, float y1, float x2, float y2, float x3, float y3, float x4, float y4)
+		static sf::Vector2f Intersect (const float x1, const float y1, const float x2, const float y2, const float x3, const float y3, const float x4, const float y4)
 		{
-			float d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+			const auto d = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
 			// If d is zero, there is no intersection
 			if (d == 0) 
 				return { 0, 0 };
 
 			// Get the x and y
-			float pre = (x1 * y2 - y1 * x2), post = (x3 * y4 - y3 * x4);
-			float x = (pre * (x3 - x4) - (x1 - x2) * post) / d;
-			float y = (pre * (y3 - y4) - (y1 - y2) * post) / d;
+			const auto pre = (x1 * y2 - y1 * x2), post = (x3 * y4 - y3 * x4);
+			const auto x = (pre * (x3 - x4) - (x1 - x2) * post) / d;
+			const auto y = (pre * (y3 - y4) - (y1 - y2) * post) / d;
 
 			// Return the point of intersection
-			return {x, y};
+			return { x, y };
 		}
 
-		static inline const sf::Vector3f& const Normalize(const sf::Vector3f& p) 
+		static sf::Vector3f Normalize(const sf::Vector3f& p) 
 		{
-			float len = sqrtf(p.x * p.x + p.y * p.y + p.z * p.z);
+			const auto len = sqrtf(p.x * p.x + p.y * p.y + p.z * p.z);
 			return { p.x / len, p.y / len, p.z / len };
 		}
 
-		static inline const sf::Vector2f& const Normalize(const sf::Vector2f& p)
+		static sf::Vector2f Normalize(const sf::Vector2f& p)
 		{
-			float len = sqrtf(p.x * p.x + p.y * p.y);
+			const auto len = sqrtf(p.x * p.x + p.y * p.y);
 			return { p.x / len, p.y / len };
 		}
 	};
@@ -140,7 +140,7 @@ namespace nova
 		float d_;
 
 	public:
-		inline Plane(sf::Vector3f point, sf::Vector3f normal) 
+		Plane(const sf::Vector3f point, const sf::Vector3f normal) 
 		{
 			point_ = point;
 			normal_ = Math::Normalize(normal);
@@ -150,16 +150,16 @@ namespace nova
 			d_ = -Math::DotProduct(point, normal);
 		}
 
-		inline float Distance(sf::Vector3f p) const
+		float Distance(const sf::Vector3f p) const
 		{
 			return (a_ * p.x + b_ * p.y + c_ * p.z + d_);
 		}
 
-		inline const sf::Vector3f& Intersect(sf::Vector3f p1, sf::Vector3f p2) const
+		sf::Vector3f Intersect(const sf::Vector3f p1, const sf::Vector3f p2) const
 		{
-			float ad = Math::DotProduct(p1, normal_);
-			float bd = Math::DotProduct(p2, normal_);
-			float t = (-d_ - ad) / (bd - ad);
+			const auto ad = Math::DotProduct(p1, normal_);
+			const auto bd = Math::DotProduct(p2, normal_);
+			const auto t = (-d_ - ad) / (bd - ad);
 			return (p2 - p1) * t + p1;
 		}
 	};
@@ -170,12 +170,12 @@ namespace nova
 		float slope_;
 
 	public:
-		inline Slope(float dy, float dx) 
+		Slope(const float dy, const float dx) 
 		{
 			slope_ = dy / dx;
 		}
 
-		inline float Interpolate(float start, float step) 
+		float Interpolate(const float start, const float step) const
 		{
 			return start + slope_ * step;
 		}
@@ -183,58 +183,57 @@ namespace nova
 
 	struct Matrix4x4
 	{
-		float m_[4][4] = { 0 };
+		float m[4][4] = { };
 
-		inline const sf::Vector3f& operator * (sf::Vector3f v)
+		sf::Vector3f operator * (sf::Vector3f v)
 		{
 			sf::Vector3f output =
 			{
-				v.x * m_[0][0] + v.y * m_[1][0] + v.z * m_[2][0] + m_[3][0],
-				v.x * m_[0][1] + v.y * m_[1][1] + v.z * m_[2][1] + m_[3][1],
-				v.x * m_[0][2] + v.y * m_[1][2] + v.z * m_[2][2] + m_[3][2]
+				v.x * m[0][0] + v.y * m[1][0] + v.z * m[2][0] + m[3][0],
+				v.x * m[0][1] + v.y * m[1][1] + v.z * m[2][1] + m[3][1],
+				v.x * m[0][2] + v.y * m[1][2] + v.z * m[2][2] + m[3][2]
 			};
 
-			float w = v.x * m_[0][3] + v.y * m_[1][3] + v.z * m_[2][3] + m_[3][3];
+			const auto w = v.x * m[0][3] + v.y * m[1][3] + v.z * m[2][3] + m[3][3];
 			if (w != 0.0f)
 				output /= w;
 
 			return output;
 		}
 
-		inline const Matrix4x4& operator * (const Matrix4x4& other) 
-		{
-			Matrix4x4 result;
-			for (int i = 0; i < 4; i++) 
-			for (int j = 0; j < 4; j++)
-			{
-				result.m_[j][i] = 
-					m_[j][0] * other.m_[0][i] +
-					m_[j][1] * other.m_[1][i] +
-					m_[j][2] * other.m_[2][i] +
-					m_[j][3] * other.m_[3][i];
-			}
+	    Matrix4x4 operator * (const Matrix4x4& other) 
+	    {
+		    Matrix4x4 result;
+		    for (auto i = 0; i < 4; i++) 
+		    for (auto j = 0; j < 4; j++)
+		    {
+			    result.m[j][i] = 
+				    m[j][0] * other.m[0][i] +
+				    m[j][1] * other.m[1][i] +
+				    m[j][2] * other.m[2][i] +
+				    m[j][3] * other.m[3][i];
+		    }
 
-			return result;
-		}
-
+		    return result;
+	    }
 	};
 
 	class ProjectionMatrix : public Matrix4x4
 	{
 	public:
-		inline ProjectionMatrix(int width, int height, int fov_degrees, float frutstrum_near, float frutstrum_far)
+		ProjectionMatrix(const int width, const int height, const  int fov_degrees, const float frutstrum_near, const float frutstrum_far)
 		{
-			float fov = 1.0f / tanf(fov_degrees * 0.5f / 180.0f * Math::pi_);
-			float aspect = (float)height / (float)width;
+			const auto fov = 1.0f / tanf(fov_degrees * 0.5f / 180.0f * Math::pi_);
+			const auto aspect = static_cast<float>(height) / static_cast<float>(width);
 
-			m_[0][0] = aspect * fov;
-			m_[1][1] = fov;
-			m_[2][2] = frutstrum_far / (frutstrum_near - frutstrum_near);
-			m_[2][3] = 1.0f;
-			m_[3][2] = (-frutstrum_far * frutstrum_near) / (frutstrum_far - frutstrum_near);
-			m_[3][3] = 0.0f;
+			m[0][0] = aspect * fov;
+			m[1][1] = fov;
+			// TODO could be a mistake here?
+			m[2][2] = frutstrum_far / (frutstrum_far - frutstrum_near);
+			m[2][3] = 1.0f;
+			m[3][2] = (-frutstrum_far * frutstrum_near) / (frutstrum_far - frutstrum_near);
+			m[3][3] = 0.0f;
 		}
-
 	};
 #pragma endregion
 
@@ -243,7 +242,7 @@ namespace nova
 	class ICanMove 
 	{
 	public:
-		inline void UpdateAngle(float angle)
+		void UpdateAngle(const float angle)
 		{
 			this->angle_ = angle;
 			this->cos_ = std::cosf(angle);
@@ -276,7 +275,7 @@ namespace nova
 
 		sf::Vector3f position_;
 		sf::Vector2f size_;
-		class sf::Image* image_;
+		class sf::Image *image_;
 		class Node* current_node_;
 		int actor_type_index_;
 	};
@@ -354,47 +353,47 @@ namespace nova
 		void SetNear(float camera_near);
 		void SetFar(float camera_far);
 
-		const sf::Vector2f& GetScale();	
-		class Node* GetCurrentNode();
+		sf::Vector2f GetScale() const;	
+		class Node* GetCurrentNode() const;
 		const std::vector<Plane>& GetClippingPlanes() const;
-		float GetFOV();
-		float GetFOVHalf();
-		float GetAngle();
-		float GetCosAngle();
-		float GetSinAngle();
-		float GetNear();
-		float GetFar();
-		const sf::Vector3f& GetPosition();
+		float GetFOV() const;
+		float GetFOVHalf() const;
+		float GetAngle() const;
+		float GetCosAngle() const;
+		float GetSinAngle() const;
+		float GetNear() const;
+		float GetFar() const;
+		const sf::Vector3f& GetPosition() const;
 
-		sf::Vector2f Project(sf::Vector3f p);
-		sf::Vector3f InverseProject(sf::Vector2f p, float z);
+		sf::Vector2f Project(sf::Vector3f p) const;
+		sf::Vector3f InverseProject(sf::Vector2f p, float z) const;
 	};
 
 	class Sprite
 	{
 	public:
-		inline Sprite() 
-			: angle_(0), actor_type_index(-1), position_(sf::Vector3f(0,0,0)) 
+		Sprite() 
+			: position_(sf::Vector3f(0,0,0)), actor_type_index_(-1), angle_(0) 
 		{
 		}
 
-		inline ~Sprite() {}
+		~Sprite() {}
 
 		sf::Vector3f position_;
-		int actor_type_index;
+		int actor_type_index_;
 		float angle_;
 	};
 
 	struct Point3D
 	{		
-		sf::Vector3f xyz_;
-		sf::Vector3f uvw_;		
-		sf::Vector3f original_position_;
+		sf::Vector3f xyz;
+		sf::Vector3f uvw;		
+		sf::Vector3f original_position;
 	};
 
 	struct Triangle 
 	{
-		class Point3D p_[3];
+		struct Point3D p[3];
 	};
 
 	class Texture
@@ -408,12 +407,12 @@ namespace nova
 		{
 			size_ = image.getSize();
 			data_ = new sf::Uint8[ size_.x * size_.y * 4 ];
-			for (int x = 0; x < size_.x; x++) 
+			for (auto x = 0; x < size_.x; x++) 
 			{
-				for (int y = 0; y < size_.y; y++) 
+				for (auto y = 0; y < size_.y; y++) 
 				{
-					int offset = (x + y * size_.x) * 4;
-					sf::Color colour = image.getPixel(x, y);
+					const auto offset = (x + y * size_.x) * 4;
+					const auto colour = image.getPixel(x, y);
 					data_[offset + 0] = colour.r;
 					data_[offset + 1] = colour.g;
 					data_[offset + 2] = colour.b;
@@ -422,33 +421,33 @@ namespace nova
 			}
 		}
 
-		inline Texture(sf::Uint32 x, sf::Uint32 y)
+		Texture(const sf::Uint32 x, const sf::Uint32 y)
 		{
 			size_ = { x, y };
 			data_ = new sf::Uint8[size_.x * size_.y * 4];
 		}
 
-		inline ~Texture() 
+		~Texture() 
 		{
 			delete[] data_;
 		}
 
-		inline const sf::Vector2u& GetSize() const
+		const sf::Vector2u& GetSize() const
 		{
 			return size_;		
 		}
 
-		inline const unsigned int GetWidth() const
+		unsigned int GetWidth() const
 		{
 			return size_.x;
 		}
 
-		inline const unsigned int GetHeight() const
+		unsigned int GetHeight() const
 		{
 			return size_.y;
 		}
 
-		inline const sf::Color& GetPixel(int index) const 
+		sf::Color GetPixel(const int index) const 
 		{
 			return
 			{
@@ -459,9 +458,9 @@ namespace nova
 			};
 		}
 
-		inline const sf::Color& GetPixel(unsigned int x, unsigned int y) const
+		sf::Color GetPixel(const unsigned int x, const unsigned int y) const
 		{
-			int offset = (x + y * size_.x) * 4;
+			const auto offset = (x + y * size_.x) * 4;
 			return 
 			{
 				data_[offset + 0],
@@ -471,39 +470,30 @@ namespace nova
 			};
 		}
 
-		inline void SetPixel(int x, int y, const sf::Color& colour) 
-		{
-			int offset = (x + y * size_.x) * 4;
+		void SetPixel(const unsigned int x, const unsigned int y, const sf::Color& colour)
+        {
+            const auto offset = (x + y * size_.x) * 4;
 			data_[offset + 0] = colour.r;
 			data_[offset + 1] = colour.g;
 			data_[offset + 2] = colour.b;
 			data_[offset + 3] = colour.a;
 		}
 
-		inline void SetPixel(int x, int y, sf::Uint8 r, sf::Uint8 g, sf::Uint8 b)
+		void SetPixel(const unsigned int x, const unsigned int y, const sf::Uint8 r, const sf::Uint8 g, const sf::Uint8 b)
 		{
-			int offset = (x + y * size_.x) * 4;
+			const auto offset = (x + y * size_.x) * 4;
 			data_[offset + 0] = r;
 			data_[offset + 1] = g;
 			data_[offset + 2] = b;
 			data_[offset + 3] = 255;
 		}
 
-		/*inline void SetPixel(int x, int y, sf::Uint8 c[])
-		{
-			int offset = (x + y * size_.x) * 4;
-			data_[offset + 0] = c[0];
-			data_[offset + 1] = c[1];
-			data_[offset + 2] = c[2];
-			data_[offset + 3] = 255;
-		}
-		*/
-		inline void Clear() 
+		void Clear() 
 		{
 			memset(&data_[0], 0xff000000, size_.x * size_.y * 4);
 		}
 
-		inline const sf::Uint8* GetData() const
+		const sf::Uint8* GetData() const
 		{
 			return data_;
 		}
@@ -529,10 +519,13 @@ namespace nova
 		int node_index_;
 
 		Wall(float x1, float y1, float x2, float y2, sf::Color colour);
-		Wall(float x1, float y1, float x2, float y2, int nodeIndex);
+		Wall(float x1, float y1, float x2, float y2, int node_index);
 		~Wall();
 
-		inline bool IsPortal() { return (node_index_ >= 0); }	
+		bool IsPortal() const
+		{
+		    return (node_index_ >= 0);
+		}	
 	};
 
 	class Node
@@ -571,7 +564,7 @@ namespace nova
 		std::vector<class Node*> nodes_;
 
 		// ambient light
-		float ambient_light_;
+		float ambient_light_{};
 	};
 
 	class Light
@@ -581,17 +574,17 @@ namespace nova
 		sf::Color colour_;
 		float intensity_;
 
-		Light(sf::Color colour, sf::Vector3f position)
-			: colour_(colour), intensity_(1.f), position_(position)
+		Light(const sf::Color colour, const sf::Vector3f position)
+			: position_(position), colour_(colour), intensity_(1.f)
 		{
 		}
 
-		inline float GetDistance(const sf::Vector3f &p) const
+		float GetDistance(const sf::Vector3f &p) const
 		{
 			return GetDistance(p.x, p.y, p.z);
 		}
 
-		inline float GetDistance(float x, float y, float z) const
+		float GetDistance(const float x, const float y, const float z) const
 		{
 			return std::sqrtf((position_.x - x) * (position_.x - x) + (position_.y - y) * (position_.y - y) + (position_.z - z) * (position_.z - z));
 		}
@@ -650,11 +643,11 @@ namespace nova
 		inline UserInputManager() :
 			mouse_position_({ 0, 0 })
 		{
-			for (int i = -1; i < sf::Keyboard::KeyCount; i++)
-				keys_[(sf::Keyboard::Key)i] = false;
+			for (auto i = -1; i < sf::Keyboard::KeyCount; i++)
+				keys_[static_cast<sf::Keyboard::Key>(i)] = false;
 
-			for (int i = 0; i < sf::Mouse::ButtonCount; i++)
-				mouse_buttons_[(sf::Mouse::Button)i] = false;
+			for (auto i = 0; i < sf::Mouse::ButtonCount; i++)
+				mouse_buttons_[static_cast<sf::Mouse::Button>(i)] = false;
 		}
 
 		std::map <sf::Keyboard::Key, bool> keys_;
@@ -692,12 +685,12 @@ namespace nova
 		// Ends the game
 		void End();
 		// Loads a map
-		inline void LoadMap(class Map* map) 
+		void LoadMap(class Map* map) 
 		{
 			current_map_ = map;
 		}
 
-		inline class Camera& GetCamera() 
+		class Camera& GetCamera() const
 		{
 			return *camera_;
 		}
@@ -714,7 +707,7 @@ namespace nova
 		// Actor Methods
 		////////////////////////////////////////////////
 		// Add an actor manually
-		inline void AddPlayer(class IPlayer* player) 
+		void AddPlayer(class IPlayer* player) 
 		{
 			//this->player_ = player;
 		}
@@ -771,7 +764,7 @@ namespace nova
 		int width_;
 		int height_;
 		bool is_fullscreen_;
-		float* depth_buffer;
+		float *depth_buffer_;
 
 		sf::Color fog_colour_;
 		float fog_occlusion_distance_;

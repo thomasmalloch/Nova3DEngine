@@ -1,3 +1,5 @@
+#include <utility>
+
 #include "Nova3DEngine.h"
 
 using namespace nova;
@@ -5,23 +7,23 @@ using namespace std;
 
 #pragma region Wall
 
-Wall::Wall(float x1, float y1, float x2, float y2, int nodeIndex) :
+Wall::Wall(const float x1, const float y1, const float x2, const float y2, const int node_index) :
 	p1_(sf::Vector2f(x1, y1)),
 	p2_(sf::Vector2f(x2, y2)),
 	colour_(sf::Color::Red),
+	wall_texture_(nullptr),
 	texture_height_pixels_(1),
-	node_index_(nodeIndex),
-	wall_texture_(nullptr)
+	node_index_(node_index)
 {
 }
 
-Wall::Wall(float x1, float y1, float x2, float y2, sf::Color colour) :
+Wall::Wall(const float x1, const float y1, const float x2, const float y2, const sf::Color colour) :
 	p1_(sf::Vector2f(x1, y1)),
 	p2_(sf::Vector2f(x2, y2)),
 	colour_(colour),
+	wall_texture_(nullptr),
 	texture_height_pixels_(1),
-	node_index_(-1),
-	wall_texture_(nullptr)
+	node_index_(-1)
 {
 }
 
@@ -34,19 +36,19 @@ Wall::~Wall()
 #pragma region Node
 
 Node::Node() :
-	ceiling_height_(32),
-	floor_height_(0),
+	ceiling_texture_(nullptr),
 	floor_texture_(nullptr),
-	ceiling_texture_(nullptr)
+	floor_height_(0),
+	ceiling_height_(32)
 {
 }
 
 Node::Node(std::vector<Wall*> walls) :
-	walls_(walls),
-	ceiling_height_(32),
-	floor_height_(0),
+	ceiling_texture_(nullptr),
 	floor_texture_(nullptr),
-	ceiling_texture_(nullptr)
+	walls_(std::move(walls)),
+	floor_height_(0),
+	ceiling_height_(32)
 {
 }
 
@@ -65,7 +67,7 @@ Map::Map() :
 {
 }
 
-Map::Map(std::string filename) :
+Map::Map(const std::string filename) :
 	player_angle_(0),
 	player_node_index_(0),
 	ambient_light_(0.2f)
