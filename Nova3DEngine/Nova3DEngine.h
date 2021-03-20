@@ -8,6 +8,9 @@
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <algorithm>
+#include <immintrin.h>
+#include <xmmintrin.h>
 
 namespace nova 
 {
@@ -18,25 +21,25 @@ namespace nova
 
 	enum RenderModeEnum 
 	{
-		RenderMode_Tile,
-		RenderMode_Portal,
+		kRenderModeTile,
+		kRenderModePortal,
 	};
 
 	enum FileParseModeEnum
 	{
-		FileParseMode_Null,
-		FileParseMode_Portal,
-		FileParseMode_Wall,
-		FileParseMode_Player,
-		FileParseMode_Node,
-		FileParseMode_Actor,
-		FileParseMode_Map,
+		kFileParseModeNull,
+		kFileParseModePortal,
+		kFileParseModeWall,
+		kFileParseModePlayer,
+		kFileParseModeNode,
+		kFileParseModeActor,
+		kFileParseModeMap,
 	};
 
 	enum TextureModeEnum
 	{
-		TextureMode_Tiled = 0,
-		TextureMode_Stretched = 1,
+		kTextureModeTiled = 0,
+		kTextureModeStretched = 1,
 	};
 
 	enum EngineMessageEnum
@@ -44,7 +47,7 @@ namespace nova
 		// Engine Messages
 
 		// User defined messages
-		EngineMessage_User = 1000,
+		kEngineMessageUser = 1000,
 	};
 
 #pragma endregion
@@ -266,55 +269,22 @@ namespace nova
 	// abstract class actor
 	class IActor
 	{
+		sf::Vector3f position_;
+		sf::Vector2f size_;
+		class sf::Image *texture_;
+		int actor_type_index_;
+
 	public:
 		// public virtual methods
 		virtual void Update(class IPlayer* player, std::vector<class IActor*> actors, class UserInputManager* input_manager) = 0;
 		virtual sf::IntRect GetCurrentFrame() = 0;
 		virtual void UpdateDirection(const sf::Vector2f& player_position) = 0;
 		virtual bool GetIsBillboard() = 0;
-
-		sf::Vector3f position_;
-		sf::Vector2f size_;
-		class sf::Image *image_;
-		class Node* current_node_;
-		int actor_type_index_;
-	};
-
-	class IPlayer : public IActor, public ICanMove
-	{
-	public:
-		// constructor/destructor
-		IPlayer();
-		IPlayer(const sf::Vector3f& position, float angle);
-		~IPlayer();
-
-		// IActor
-		virtual void Update(class IPlayer* player, std::vector<class IActor*> actors, class UserInputManager* input_manager) override {}
-		virtual void UpdateDirection(const sf::Vector2f& player_position) override {}
-		virtual sf::IntRect GetCurrentFrame() override
-		{
-			return { 0,0,0,0 };
-		}
-
-		virtual bool GetIsBillboard() override 
-		{
-			return false;
-		}
-
-		// public members
-		class Node* node_;
-		float pitch_;
-		float height_;		
 	};
 
 #pragma endregion
 
 #pragma region Renderers
-
-	class IRenderer
-	{
-		
-	};
 
 #pragma region Portal Renderer
 
@@ -322,7 +292,7 @@ namespace nova
 	{
 	private:
 		float x_scale_;
-		float y_scale_;		
+		float y_scale_;
 		float screen_width_;
 		float screen_height_;
 		float fov_;
@@ -339,7 +309,6 @@ namespace nova
 		class std::vector<Plane> clipping_planes_;
 
 		void UpdateClippingPlanes();
-
 	public:
 		
 		Camera(float screen_width, float screen_height);
@@ -369,21 +338,6 @@ namespace nova
 		sf::Vector3f InverseProject(sf::Vector2f p, float z) const;
 	};
 
-	class Sprite
-	{
-	public:
-		Sprite() 
-			: position_(sf::Vector3f(0,0,0)), actor_type_index_(-1), angle_(0) 
-		{
-		}
-
-		~Sprite() {}
-
-		sf::Vector3f position_;
-		int actor_type_index_;
-		float angle_;
-	};
-
 	struct Point3D
 	{		
 		sf::Vector3f xyz;
@@ -394,109 +348,6 @@ namespace nova
 	struct Triangle 
 	{
 		struct Point3D p[3];
-	};
-
-	class Texture
-	{
-	private:
-		sf::Uint8* data_;
-		sf::Vector2u size_;
-
-	public:
-		inline Texture(const class sf::Image& image) 
-		{
-			size_ = image.getSize();
-			data_ = new sf::Uint8[ size_.x * size_.y * 4 ];
-			for (auto x = 0; x < size_.x; x++) 
-			{
-				for (auto y = 0; y < size_.y; y++) 
-				{
-					const auto offset = (x + y * size_.x) * 4;
-					const auto colour = image.getPixel(x, y);
-					data_[offset + 0] = colour.r;
-					data_[offset + 1] = colour.g;
-					data_[offset + 2] = colour.b;
-					data_[offset + 3] = colour.a;
-				}
-			}
-		}
-
-		Texture(const sf::Uint32 x, const sf::Uint32 y)
-		{
-			size_ = { x, y };
-			data_ = new sf::Uint8[size_.x * size_.y * 4];
-		}
-
-		~Texture() 
-		{
-			delete[] data_;
-		}
-
-		const sf::Vector2u& GetSize() const
-		{
-			return size_;		
-		}
-
-		unsigned int GetWidth() const
-		{
-			return size_.x;
-		}
-
-		unsigned int GetHeight() const
-		{
-			return size_.y;
-		}
-
-		sf::Color GetPixel(const int index) const 
-		{
-			return
-			{
-				data_[index + 0],
-				data_[index + 1],
-				data_[index + 2],
-				data_[index + 3]
-			};
-		}
-
-		sf::Color GetPixel(const unsigned int x, const unsigned int y) const
-		{
-			const auto offset = (x + y * size_.x) * 4;
-			return 
-			{
-				data_[offset + 0],
-				data_[offset + 1],
-				data_[offset + 2],
-				data_[offset + 3]
-			};
-		}
-
-		void SetPixel(const unsigned int x, const unsigned int y, const sf::Color& colour)
-        {
-            const auto offset = (x + y * size_.x) * 4;
-			data_[offset + 0] = colour.r;
-			data_[offset + 1] = colour.g;
-			data_[offset + 2] = colour.b;
-			data_[offset + 3] = colour.a;
-		}
-
-		void SetPixel(const unsigned int x, const unsigned int y, const sf::Uint8 r, const sf::Uint8 g, const sf::Uint8 b)
-		{
-			const auto offset = (x + y * size_.x) * 4;
-			data_[offset + 0] = r;
-			data_[offset + 1] = g;
-			data_[offset + 2] = b;
-			data_[offset + 3] = 255;
-		}
-
-		void Clear() 
-		{
-			memset(&data_[0], 0xff000000, size_.x * size_.y * 4);
-		}
-
-		const sf::Uint8* GetData() const
-		{
-			return data_;
-		}
 	};
 
 	class Wall
@@ -512,7 +363,7 @@ namespace nova
 
 		// Texture and Colour information
 		sf::Color colour_;
-		const Texture* wall_texture_;
+		const class sf::Image *wall_texture_;
 		float texture_height_pixels_;
 
 		// Portal destination
@@ -531,8 +382,8 @@ namespace nova
 	class Node
 	{
 	public:
-		const Texture* ceiling_texture_;
-		const Texture* floor_texture_;
+		const class sf::Image *ceiling_texture_;
+		const class sf::Image *floor_texture_;
 		std::vector<class Wall*> walls_;
 		std::vector<class Sprite*> temp_;
 		std::vector<class IActor*> actors_;
@@ -587,6 +438,11 @@ namespace nova
 		float GetDistance(const float x, const float y, const float z) const
 		{
 			return std::sqrtf((position_.x - x) * (position_.x - x) + (position_.y - y) * (position_.y - y) + (position_.z - z) * (position_.z - z));
+		}
+
+		float GetDistanceSquared(const float x, const float y, const float z) const
+		{
+			return (position_.x - x) * (position_.x - x) + (position_.y - y) * (position_.y - y) + (position_.z - z) * (position_.z - z);
 		}
 	};
 
@@ -727,26 +583,26 @@ namespace nova
 		// renders the verticle walls of the map
 		void RenderMap(const class Node& render_node, const class Node& last_node,
 			const sf::Vector2f normalized_bounds[4],
-			class Texture* pixels, class sf::RenderTexture& minimap);
+			class sf::Image *pixels, class sf::RenderTexture &minimap);
 
-		void RasterizeVerticalSlice(class Texture* pixels, const class Texture& texture,
+		void RasterizeVerticalSlice(class sf::Image *pixels, const class sf::Image &texture,
 			const Point3D points[2], const sf::IntRect& portal_screen_space);
 
 		// renders the floors and ceiling
-		void RasterizePolygon(class Texture* pixels, const class Point3D points[], int vertex_count, const class Texture& texture);
-		void RenderPlanes(class Texture* pixels, const class Node& render_node, class sf::RenderTexture& minimap);
+		void RasterizePolygon(class sf::Image *pixels, const struct Point3D points[], int vertex_count, const class sf::Image &texture);
+		void RenderPlanes(class sf::Image *pixels, const class Node& render_node, class sf::RenderTexture& minimap);
 
 		// plots a texel to the pixel texture.
 		// also applies fog and lighting
 		inline void DrawPixel(
-			class Texture *pixels, int x, int y,
-			float u, float v, const class Texture &texture,
+			class sf::Image *pixels, int x, int y,
+			float u, float v, const class sf::Image &texture,
 			float z, float map_x, float map_y, float map_z);
 
 		// returns the new number of verticies
-		int ClipPolygon(class Point3D points[], int num_points);
+		int ClipPolygon(struct Point3D points[], int num_points);
 
-		void RenderNodeActors(const class Node& node, class Texture* pixels, const sf::FloatRect& normalized_bounds);
+		void RenderNodeActors(const class Node& node, class sf::Image *pixels, const sf::FloatRect& normalized_bounds);
 		void RenderUI();
 		void UpdateActorPositions();
 		void ProcessInput(const class sf::Event& event);		

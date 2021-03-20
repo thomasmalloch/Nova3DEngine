@@ -100,7 +100,7 @@ Map::Map(const std::string filename) :
 			current = index + 1;
 		}
 
-		FileParseModeEnum mode = FileParseMode_Null;
+		FileParseModeEnum mode = kFileParseModeNull;
 		for (unsigned i = 0; i < words.size(); i++)
 		{
 			bool isFinishedWithLine = false;
@@ -110,43 +110,43 @@ Map::Map(const std::string filename) :
 				if (word == "node")
 				{
 					nodes_.push_back(new class Node());
-					mode = FileParseMode_Node;
+					mode = kFileParseModeNode;
 				}
 				else if (word == "portal")
 				{
-					mode = FileParseMode_Portal;
+					mode = kFileParseModePortal;
 				}
 				else if (word == "wall")
 				{
-					mode = FileParseMode_Wall;
+					mode = kFileParseModeWall;
 				}
 				else if (word == "player")
 				{
-					mode = FileParseMode_Player;
+					mode = kFileParseModePlayer;
 				}
 				else if (word == "actor")
 				{
-					mode = FileParseMode_Actor;
+					mode = kFileParseModeActor;
 				}
 				else if (word == "map")
 				{
-					mode = FileParseMode_Map;
+					mode = kFileParseModeMap;
 				}
 				else
 				{
-					mode = FileParseMode_Null;
+					mode = kFileParseModeNull;
 				}
 			}
 			else
 			{
 				switch (mode)
 				{
-				case FileParseMode_Node:
+				case kFileParseModeNode:
 					nodes_[nodes_.size() - 1]->floor_height_ = (float)atof(words[i + 0].c_str());
 					nodes_[nodes_.size() - 1]->ceiling_height_ = (float)atof(words[i + 1].c_str());
 					isFinishedWithLine = true;
 					break;
-				case FileParseMode_Portal:
+				case kFileParseModePortal:
 				{
 					Wall* portal = new Wall(
 						(float)atof(words[i + 0].c_str()) * 10.f,
@@ -159,7 +159,7 @@ Map::Map(const std::string filename) :
 					isFinishedWithLine = true;
 					break;
 				}
-				case FileParseMode_Wall:
+				case kFileParseModeWall:
 				{
 					int argb = atoi(words[i + 4].c_str());
 					sf::Color colour = sf::Color(
@@ -179,7 +179,7 @@ Map::Map(const std::string filename) :
 					isFinishedWithLine = true;
 					break;
 				}
-				case FileParseMode_Player:
+				case kFileParseModePlayer:
 					this->player_start_.x = (float)atof(words[i + 0].c_str());
 					this->player_start_.y = (float)atof(words[i + 1].c_str());
 					this->player_start_.z = (float)atof(words[i + 2].c_str());
@@ -187,7 +187,7 @@ Map::Map(const std::string filename) :
 					this->player_node_index_ = atoi(words[i + 4].c_str());
 					isFinishedWithLine = true;
 					break;
-				case FileParseMode_Actor:
+				case kFileParseModeActor:
 				{
 					float x = (float)atof(words[i + 0].c_str());
 					float y = (float)atof(words[i + 1].c_str());
@@ -208,7 +208,7 @@ Map::Map(const std::string filename) :
 					isFinishedWithLine = true;
 					break;
 				}
-				case FileParseMode_Map:
+				case kFileParseModeMap:
 				{
 					if (words.size() > i)
 						ambient_light_ = (float)atof(words[i].c_str());
@@ -216,7 +216,7 @@ Map::Map(const std::string filename) :
 					isFinishedWithLine = true;
 					break;
 				}
-				case FileParseMode_Null:
+				case kFileParseModeNull:
 				default:
 					break;
 				}

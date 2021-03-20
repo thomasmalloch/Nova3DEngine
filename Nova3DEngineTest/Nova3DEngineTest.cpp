@@ -6,33 +6,30 @@
 
 using namespace nova;
 
-class Player : public nova::IPlayer
-{
-	void Update(class IPlayer* player, std::vector<class IActor*> actors, const class UserInputManager* input_manager)
-	{
-	}
-
-};
-
 class EngineTest : public nova::NovaEngine
 {
 private:
-	class Player* player_;
-	class Map* map_;
+	//class Player *player_;
+	class Map *map_;
 
-	class Texture* wall_texture_;
-	class Texture* floor_texture_;
-	class Texture* ceiling_texture_;
+	class sf::Image *wall_texture_;
+	class sf::Image *floor_texture_;
+	class sf::Image *ceiling_texture_;
 
-	LPWSTR command_line_;
+	std::string command_line_;
+	int player_height_ = 16;
 
 public:
-	EngineTest(LPWSTR command_line) 
-	{
-		command_line_ = command_line;		
-	}
+	EngineTest(const std::string command_line) :
+        map_(nullptr),
+        wall_texture_(nullptr),
+        floor_texture_(nullptr),
+        ceiling_texture_(nullptr)
+    {
+        command_line_ = command_line;
+    }
 
-	void UserLoad() 
+    void UserLoad() 
 	{
 		/*Wall *w1 = new Wall(-10, 32, -10, -32, sf::Color::White);
 		Wall *w2 = new Wall(10, 32, 10, -32, sf::Color::White);
@@ -58,36 +55,21 @@ public:
 		//std::wcsstr(
 		
 		//char zoop[100] = { 0 };
-		std::wstring wide(command_line_);
-		std::string zoop(wide.begin(), wide.end());
+		
 
-		if (zoop.length() == 0)
-			zoop = "lighttest.map";
+		if (command_line_.length() == 0)
+			command_line_ = "lighttest.map";
 
-		map_ = new Map(zoop);
-		if (map_->nodes_.size() > 1) 
-		{
-			map_->nodes_[1]->floor_height_ -= 10;
-			map_->nodes_[1]->ceiling_height_ -= 10;
-		}
+		map_ = new Map(command_line_);
 
-		if (map_->nodes_.size() > 4) 
-		{
-			map_->nodes_[4]->floor_height_ += 10;
-			map_->nodes_[4]->ceiling_height_ += 10;
-		}
+		wall_texture_ = new sf::Image();
+		wall_texture_->loadFromFile("wall.png");
 
-		sf::Image wall_image;
-		wall_image.loadFromFile("wall.png");
-		wall_texture_ = new Texture(wall_image);
+		floor_texture_ = new sf::Image();
+		floor_texture_->loadFromFile("floor.png");
 
-		sf::Image floor_image;
-		floor_image.loadFromFile("floor.png");
-		floor_texture_ = new Texture(floor_image);
-
-		sf::Image ceiling_image;
-		ceiling_image.loadFromFile("ceiling.png");
-		ceiling_texture_ = new Texture(ceiling_image);
+		ceiling_texture_ = new sf::Image();
+		ceiling_texture_->loadFromFile("ceiling.png");
 
 		// add texture to walls/floor/ceiling
 		int plane_tex_width = 100;
@@ -147,22 +129,14 @@ public:
 
 		LoadMap(map_);
 
-		player_ = new Player();
-		player_->position_ = map_->player_start_;
-		player_->UpdateAngle(map_->player_angle_ + 0.01f);
-		player_->current_node_ = map_->nodes_[map_->player_node_index_];
-		player_->height_ = 16;		
-		AddPlayer(player_);
-
-		this->GetCamera().SetCurrentNode(player_->current_node_);
-		this->GetCamera().SetPosition( { player_->position_.x, player_->position_.y, player_->position_.z + player_->height_ } );
+		this->GetCamera().SetCurrentNode(map_->nodes_[map_->player_node_index_]);
+		this->GetCamera().SetPosition( { map_->player_start_.x, map_->player_start_.y, map_->player_start_.z + player_height_ } );
 		this->GetCamera().SetFOVRadians(Math::half_pi_);
-		this->GetCamera().SetAngle(player_->angle_);
+		this->GetCamera().SetAngle(map_->player_angle_ + 0.001f);
 	}
 
 	void UserUnload()
 	{
-		delete player_;
 		delete map_;
 		delete floor_texture_;
 		delete ceiling_texture_;
@@ -177,8 +151,8 @@ public:
 
 	void UpdateWorker(sf::Time delta, class UserInputManager& input_manager)
 	{
-		float forward = (0.00004f * delta.asMicroseconds());
-		float angle = (0.000002f * delta.asMicroseconds());
+		const auto forward = (0.00004f * delta.asMicroseconds());
+		const auto angle = (0.000002f * delta.asMicroseconds());
 
 		// fov adjust
 		if (input_manager.keys_[sf::Keyboard::Key::Numpad5])
@@ -187,7 +161,7 @@ public:
 		}
 		else if (input_manager.keys_[sf::Keyboard::Key::Numpad6]) 
 		{
-			float fov = this->GetCamera().GetFOV();
+			auto fov = this->GetCamera().GetFOV();
 			fov -= angle;
 			if (fov < FLT_EPSILON)
 				fov = FLT_EPSILON;
@@ -196,7 +170,7 @@ public:
 		}
 		else if (input_manager.keys_[sf::Keyboard::Key::Numpad4])
 		{
-			float fov = this->GetCamera().GetFOV();
+			auto fov = this->GetCamera().GetFOV();
 			fov += angle;
 			if (fov > Math::pi_)
 				fov = Math::pi_;
@@ -207,52 +181,53 @@ public:
 		// player movement
 		if (input_manager.keys_[sf::Keyboard::Key::Left])
 		{
-			float f = this->player_->angle_ -= angle;
-			this->player_->UpdateAngle(f);
+			auto f = this->GetCamera().GetAngle();
+			f -= angle;
 			this->GetCamera().SetAngle(f);
 		}
 
 		if (input_manager.keys_[sf::Keyboard::Key::Right])
 		{
-			float f = this->player_->angle_ += angle;
-			this->player_->UpdateAngle(f);
+			auto f = this->GetCamera().GetAngle();
+			f += angle;
 			this->GetCamera().SetAngle(f);
 		}
 
-		sf::Vector2f m = { 0,0 };
-		bool movement_pressed = false;
+		sf::Vector3f m = { 0,0, 0 };
+		auto movement_pressed = false;
 		if (input_manager.keys_[sf::Keyboard::Key::W])
 		{
-			m.x += cosf(this->player_->angle_) * forward;
-			m.y += sinf(this->player_->angle_) * forward;
+			m.x += this->GetCamera().GetCosAngle() * forward;
+			m.y += this->GetCamera().GetSinAngle() * forward;
 			movement_pressed = true;
 		}
 
 		if (input_manager.keys_[sf::Keyboard::Key::S])
 		{
-			m.x -= cosf(this->player_->angle_) * forward;
-			m.y -= sinf(this->player_->angle_) * forward;
+			m.x -= this->GetCamera().GetCosAngle() * forward;
+			m.y -= this->GetCamera().GetSinAngle() * forward;
 			movement_pressed = true;
 		}
 
 		if (input_manager.keys_[sf::Keyboard::Key::D])
 		{
-			m.x += cosf(this->player_->angle_ + Math::half_pi_) * forward;
-			m.y += sinf(this->player_->angle_ + Math::half_pi_) * forward;
+			m.x += cosf(this->GetCamera().GetAngle() + Math::half_pi_) * forward;
+			m.y += sinf(this->GetCamera().GetAngle() + Math::half_pi_) * forward;
 			movement_pressed = true;
 		}
 
 		if (input_manager.keys_[sf::Keyboard::Key::A])
 		{
-			m.x -= cosf(this->player_->angle_ + Math::half_pi_) * forward;
-			m.y -= sinf(this->player_->angle_ + Math::half_pi_) * forward;
+			m.x -= cosf(this->GetCamera().GetAngle() + Math::half_pi_) * forward;
+			m.y -= sinf(this->GetCamera().GetAngle() + Math::half_pi_) * forward;
 			movement_pressed = true;
 		}
 
 		if (movement_pressed)
 		{
-			this->player_->position_ = sf::Vector3f(this->player_->position_.x + m.x, this->player_->position_.y + m.y, this->player_->position_.z);
-			this->GetCamera().SetPosition( { player_->position_.x, player_->position_.y, player_->position_.z + player_->height_ } );
+			//this->player_->position_ = sf::Vector3f(this->player_->position_.x + m.x, this->player_->position_.y + m.y, this->player_->position_.z);
+			const auto postion = this->GetCamera().GetPosition() + m;
+			this->GetCamera().SetPosition(postion);
 		}
 	}
 
@@ -269,11 +244,14 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_ int       nCmdShow)
 {
 
-	
-	auto test = EngineTest(lpCmdLine);
+	//auto square = Math::FastSquare(25);
+
+	std::wstring wide(lpCmdLine);
+	std::string zoop(wide.begin(), wide.end());
+	auto test = EngineTest(zoop);
 
 #if _DEBUG
-	test.Setup(1280, 720, 4, false);
+	test.Setup(1280, 720, 3, false);
 #else
 	test.Setup(1280, 720, 2, false);
 #endif

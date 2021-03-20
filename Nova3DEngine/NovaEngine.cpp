@@ -54,7 +54,6 @@ bool NovaEngine::Setup(const int width, const int height, const int pixel_scale,
 		return false;
 	}
 
-
 	return true;
 }
 
@@ -65,8 +64,6 @@ void NovaEngine::Run()
 	auto framerate_time_delta = sf::Time::Zero;
 	
 	// create pixel buffer
-	auto *pixels = new Texture(width_, height_);
-
 	sf::Image pixel_buffer;
 	pixel_buffer.create(width_, height_);
 
@@ -144,16 +141,16 @@ void NovaEngine::Run()
 		for (auto x = 0; x < width_; x++)
 		{
 			for (auto y = 0; y < height_; y++)
-				pixels->SetPixel(x, y, fog_colour_);
+				pixel_buffer.setPixel(x, y, fog_colour_);
 		}
 
 		// render floors and ceiling
 		for (auto *node : current_map_->nodes_)		
-			RenderPlanes(pixels, *node, minimap);
+			RenderPlanes(&pixel_buffer, *node, minimap);
 		
 		// render map
 		sf::Vector2f render_bounds[4] = { {0, 0}, {1.f, 0}, {1.f, 1.f}, {0.f, 1.f} };
-		RenderMap(*camera_->GetCurrentNode(), *camera_->GetCurrentNode(), render_bounds, pixels, minimap);
+		RenderMap(*camera_->GetCurrentNode(), *camera_->GetCurrentNode(), render_bounds, &pixel_buffer, minimap);
 
 		// add to minimap
 		sf::RectangleShape player;
@@ -186,8 +183,10 @@ void NovaEngine::Run()
 		minimap.draw(&lines[0], lines.size(), sf::Lines);
 		minimap.draw(player);
 
+		//glDrawArrays(GL_POINTS
+
 		// draw map
-		texture.update(pixels->GetData());
+		texture.update(pixel_buffer);
 		render_window_->draw(buffer);
 
 		// draw minimap
@@ -203,19 +202,18 @@ void NovaEngine::Run()
 
 		render_window_->display();
 	}
-
-	delete pixels;
 }
 
 void NovaEngine::End() 
 {
 	is_running_ = false;
+	delete[] depth_buffer_;
 	UserUnload();
 }
 
 
 void NovaEngine::RenderMap(const class Node& render_node, const class Node& last_node,
-	const sf::Vector2f normalized_bounds[4], class Texture* pixels, class sf::RenderTexture& minimap)
+	const sf::Vector2f normalized_bounds[4], class sf::Image *pixels, class sf::RenderTexture& minimap)
 {
 	// render walls and minimap
 	std::vector<sf::Vertex> lines;
@@ -462,10 +460,11 @@ void NovaEngine::RenderMap(const class Node& render_node, const class Node& last
 	minimap.draw(&lines[0], lines.size(), sf::Lines);
 }
 
-void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_node, class sf::RenderTexture& minimap)
+void NovaEngine::RenderPlanes(class sf::Image *pixels, const class Node& render_node, class sf::RenderTexture& minimap)
 {
 	// render the floor/ceiling. this uses actual 3d projection!
 	// floor
+
 	vector<Point3D> plane_polygon;
 	plane_polygon.resize(render_node.plane_xy_.size() * 2);
 	for (auto i = 0; i < static_cast<int>(render_node.plane_xy_.size()); i++) 
@@ -549,7 +548,7 @@ void NovaEngine::RenderPlanes(class Texture* pixels, const class Node& render_no
 }
 
 // Rasterizes a CONVEX polygon with a CLOCKWISE winding
-void NovaEngine::RasterizePolygon(class Texture* pixels, const struct Point3D vertices[], int vertex_count, const class Texture& texture)
+void NovaEngine::RasterizePolygon(class sf::Image *pixels, const struct Point3D vertices[], int vertex_count, const class sf::Image &texture)
 {
 	for (auto i = 0; i < vertex_count - 3 + 1; i++) 
 	{
@@ -598,7 +597,6 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const struct Point3D ve
 
 		if (y2 - y1)
 		{
-            auto y_map = Slope(points[1].original_position.x - points[0].original_position.x, y2 - y1);
 			for (int y = Math::Clamp(0, height_, y1); (y < y2) && (y < height_); y++)
 			{
 				int x1 = ax.Interpolate(points[0].xyz.x, y - y1) * width_;
@@ -643,11 +641,7 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const struct Point3D ve
 					x_map = (1.0f - t) * x1_map + t * x2_map;
 					y_map = (1.0f - t) * y1_map + t * y2_map;
 
-					auto z = 1.f / tex_w;
-					if (depth_buffer_[x + y * width_] < z)
-						continue;
-
-					depth_buffer_[x + y * width_] = z;
+					const auto z = 1.f / tex_w;
 					DrawPixel(
 						pixels, x, y,
 						tex_u / tex_w, tex_v / tex_w, texture,
@@ -706,6 +700,7 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const struct Point3D ve
 				
 				auto tstep = 1.f / static_cast<float>(x2 - x1);
 				auto t = 0.f;
+
 				for (int x = Math::Clamp(0, width_, x1); (x < x2) && (x < width_); x++)
 				{
 					tex_u = (1.0f - t) * u1 + t * u2;
@@ -714,16 +709,11 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const struct Point3D ve
 					x_map = (1.0f - t) * x1_map + t * x2_map;
 					y_map = (1.0f - t) * y1_map + t * y2_map;
 
-					auto z = 1.f / tex_w;
-					if (depth_buffer_[x + y * width_] < z)
-						continue;
-
-					depth_buffer_[x + y * width_] = z;
-					
+					const auto z = 1.f / tex_w;
 					DrawPixel(
 						pixels, x, y,
 						tex_u / tex_w, tex_v / tex_w, texture,
-						z,	
+						z,
 						x_map / tex_w,
 						y_map / tex_w,
 						points[0].original_position.z);
@@ -736,7 +726,7 @@ void NovaEngine::RasterizePolygon(class Texture* pixels, const struct Point3D ve
 }
 
 void NovaEngine::RasterizeVerticalSlice(
-	class Texture *pixels, const class Texture &texture,
+	class sf::Image *pixels, const class sf::Image &texture,
 	const Point3D points[2], const sf::IntRect &portal_screen_space)
 {
 	if (points[0].xyz.y == INT_MIN || points[1].xyz.y == INT_MIN)
@@ -749,6 +739,7 @@ void NovaEngine::RasterizeVerticalSlice(
 
 	const auto v_slope = Slope(points[1].uvw.y - points[0].uvw.y, points[1].xyz.y - points[0].xyz.y);
 	const auto z_map = Slope(points[1].original_position.z - points[0].original_position.z, points[1].xyz.y - points[0].xyz.y);
+
 	for (auto y = y1; y < y2; y++)
 	{
 		if ((y >= portal_screen_space.top) && (y <= (portal_screen_space.top + portal_screen_space.height)))
@@ -757,10 +748,6 @@ void NovaEngine::RasterizeVerticalSlice(
 		if ((y < y1) || (y >= y2))
 			break;
 
-		if (depth_buffer_[x + y * width_] < points[0].xyz.z)
-			continue;
-
-		depth_buffer_[x + y * width_] = points[0].xyz.z;
 		const auto v = v_slope.Interpolate(points[0].uvw.y, y - points[0].xyz.y);
 		DrawPixel(
 			pixels, x, y,
@@ -769,6 +756,7 @@ void NovaEngine::RasterizeVerticalSlice(
 			points[0].original_position.x,
 			points[0].original_position.y,
 			z_map.Interpolate(points[0].original_position.z, y - points[0].xyz.y));
+
 	}
 }
 
@@ -778,6 +766,7 @@ int NovaEngine::ClipPolygon(struct Point3D points[], const int num_points)
 	new_points.resize(num_points * 2);
 	auto poly_count = num_points;
 	auto clipped_count = 0;
+
 
 	for (const auto &plane : camera_->GetClippingPlanes()) 
 	{
@@ -848,8 +837,8 @@ int NovaEngine::ClipPolygon(struct Point3D points[], const int num_points)
 }
 
 inline void NovaEngine::DrawPixel(
-    class Texture* pixels, const int x, const int y,
-    float u, float v, const class Texture& texture,
+    class sf::Image *pixels, const int x, const int y,
+    float u, float v, const class sf::Image &texture,
     float z, const float map_x, const float map_y, const float map_z)
 {	
 	// quick lerp
@@ -858,27 +847,40 @@ inline void NovaEngine::DrawPixel(
 		return a + (b - a) * f;
 	};
 
-	// get texture pixel and bi-linear filter
-	u = Math::Clamp(0, texture.GetWidth(), fmodf(u * texture.GetWidth(), texture.GetWidth()));
-	v = Math::Clamp(0, texture.GetHeight(), fmodf(v * texture.GetHeight(), texture.GetHeight()));
+	if (depth_buffer_[x + y * width_] < z)
+		return;
 
-	auto colour = texture.GetPixel(u, v);
+	// get texture pixel and bi-linear filter
+	const sf::Vector2u size = texture.getSize();
+	
+    u = Math::Clamp(0, size.x, fmodf(u * size.x, size.x));
+	v = Math::Clamp(0, size.y, fmodf(v * size.y, size.y));
+
+	auto colour = texture.getPixel(u, v);
 	if (colour.a == 0)
 		return;
+
+	depth_buffer_[x + y * width_] = z;
+
+#if _DEBUG
+	// dont light/fog shade for debugging
+	pixels->setPixel(x, y, colour);
+	return;
+#endif
 
 	const auto dx = camera_->GetPosition().x - map_x;
 	const auto dy = camera_->GetPosition().y - map_y;
 	const auto dz = camera_->GetPosition().z - map_z;
-	z = std::sqrtf(dx * dx + dy * dy + dz * dz);
-	
+
 	// calculate lights
 	float r = 0;
 	float g = 0;
 	float b = 0;
+
 	for (auto *light : lights_)
 	{
-		const auto dist = light->GetDistance(map_x, map_y, map_z);
-		const auto light_magnitude = std::powf(dist, -2) * 1000;
+		const auto dist_square = light->GetDistanceSquared(map_x, map_y, map_z);
+		const auto light_magnitude = 1.f / dist_square * 1000;
 
 		r += light->colour_.r / 255.f * light_magnitude;
 		g += light->colour_.g / 255.f * light_magnitude;
@@ -886,7 +888,9 @@ inline void NovaEngine::DrawPixel(
 	}
 
 	// get luminosity and clamp light values
-	const auto light_lum = (0.2126f * r + 0.7152f * g + 0.0722f * b);
+	auto light_lum = (0.2126f * r + 0.7152f * g + 0.0722f * b);
+	if (light_lum > 1.25f)
+		light_lum = 1.25f;
 
 	// TODO fix saturation here
 	if (r > 1)
@@ -896,16 +900,17 @@ inline void NovaEngine::DrawPixel(
 	if (b > 1)
 		b = 1;
 
-	// mix fog
+	// mix light fog
 	colour.r = mix(r, colour.r, 255);
 	colour.g = mix(g, colour.g, 255);
 	colour.b = mix(b, colour.b, 255);
 
-	// subtract light luminosity
-	auto mag = std::powf(z, fog_density_) / 255.f - light_lum;
+	// subtract light luminosity from fog (lights shine through fog)
+	auto mag = std::pow(z, fog_density_) / 255.f - light_lum;
 	if (mag < 0)
 		mag = 0;
 
+	// mix fog
 	if (mag >= 1)
 	{
 		colour = fog_colour_;
@@ -917,14 +922,15 @@ inline void NovaEngine::DrawPixel(
 		colour.b = mix(mag, colour.b, fog_colour_.b);
 	}
 
-	pixels->SetPixel(x, y, colour);
+	pixels->setPixel(x, y, colour);
 }
 
-void NovaEngine::RenderNodeActors(const class Node& node, class Texture* pixels, const sf::FloatRect& normalized_bounds)
+void NovaEngine::RenderNodeActors(const class Node &node, class sf::Image *pixels, const sf::FloatRect &normalized_bounds)
 {
-	for (auto actor : node.actors_) 
+	for (auto *actor : node.actors_)
 	{
-	
+
+
 	}
 }
 
@@ -966,24 +972,4 @@ void NovaEngine::RenderUI()
 {
 	if (ui_root_ == nullptr)
 		return;
-}
-
-IPlayer::IPlayer() :
-	pitch_(0),
-	node_(nullptr)
-{
-	this->position_ = sf::Vector3f();
-	this->UpdateAngle(0);
-}
-
-IPlayer::IPlayer(const sf::Vector3f& position, float angle) :
-	pitch_(0),
-	node_(nullptr)
-{
-	this->position_ = position;
-	this->UpdateAngle(angle);
-}
-
-IPlayer::~IPlayer()
-{
 }
