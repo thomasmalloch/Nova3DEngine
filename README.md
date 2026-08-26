@@ -227,14 +227,11 @@ project, not hidden bugs.
 
 - `RenderPlanes` runs for every node in the map each frame, not only for
   visible ones. Floors and ceilings for rooms behind the camera are still
-  clipped and often rejected, but the work is done. Restricting this to the
-  set of nodes reached during portal recursion is the single biggest win
-  available.
+  clipped and often rejected, but unnecessary rooms are still rendered.
 - Wall `v` coordinates are interpolated affinely down each vertical slice.
   This is correct for vertical walls but would need perspective correction
   if sloped walls were added.
-- Texture sampling is nearest-neighbour. A code comment mentions bilinear
-  filtering, which is a plan rather than a description.
+- Texture sampling is nearest-neighbour.
 - The far clipping plane is built but not pushed into the plane list. Draw
   distance is currently controlled by `fog_occlusion_distance_` instead.
 - Top and bottom clipping planes are not used. Vertical bounds are handled
@@ -312,7 +309,7 @@ Roughly in order of value:
 
 ## Credits
 
-- Engine and editor: <!-- TODO: your name -->
+- Engine and editor: Thomas Malloch
 - Renderer techniques: Bisqwit's portal rendering series and
   OneLoneCoder's software 3D rendering series
 - Windowing, input and audio: [SFML](https://www.sfml-dev.org/)
