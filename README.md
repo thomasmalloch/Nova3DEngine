@@ -8,9 +8,9 @@ only to open a window and copy the finished pixel buffer to the screen.
 The repository also contains a Windows Forms level editor that writes the
 `.map` files the engine reads.
 
-<!-- TODO: add screenshots here.
-     Suggested: one wide shot of a lit room, one of a portal view,
-     and one of the editor with a multi-node level open. -->
+<img width="1282" height="759" alt="screenshot1" src="https://github.com/user-attachments/assets/045aded1-5426-469c-b3d3-606c2046d7e3" />
+<img width="1282" height="759" alt="screenshot2" src="https://github.com/user-attachments/assets/463dfb0e-a85e-45b1-8060-7c16235c05e5" />
+<img width="1242" height="694" alt="mapeditor" src="https://github.com/user-attachments/assets/008f5024-f9a4-4f4c-bc9f-c3a5b38813d5" />
 
 ## Background
 
@@ -316,7 +316,3 @@ Roughly in order of value:
 - Renderer techniques: Bisqwit's portal rendering series and
   OneLoneCoder's software 3D rendering series
 - Windowing, input and audio: [SFML](https://www.sfml-dev.org/)
-
-## License
-
-<!-- TODO: pick a license. MIT is a good default for a portfolio project. -->
