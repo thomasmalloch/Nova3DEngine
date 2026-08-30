@@ -26,10 +26,7 @@ extended after the jam with:
 - A depth buffer, so geometry can be submitted in any order
 
 The design is based on ideas from Bisqwit's portal renderer videos and
-OneLoneCoder's 3D software renderer videos, reimplemented rather than copied.
-
-All of the code here was written by hand, before any AI coding assistance
-existed.
+OneLoneCoder's 3D software renderer videos.
 
 ## Design goal
 
@@ -37,7 +34,7 @@ The C++ side is deliberately kept to a small number of files. The long-term
 goal is a single header that a user can drop into a project, subclass, and
 run, in the same spirit as OneLoneCoder's `olcPixelGameEngine.h`. Everything
 in `NovaEngine.cpp`, `Camera.cpp` and `Geometry.cpp` is intended to fold back
-into `Nova3DEngine.h` once the API stops moving.
+into `Nova3DEngine.h`.
 
 ## Features
 
